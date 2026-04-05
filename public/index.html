@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>DataFlow</title>
+<meta name="theme-color" content="#1a73e8">
+<meta name="description" content="DataFlow: Secure Family Data Vault">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a73e8'/><text x='16' y='23' font-size='18' font-weight='bold' text-anchor='middle' fill='white'>D</text></svg>">
+<link rel="manifest" href="/manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<a href="#ct" class="skip-link">Skip to content</a>
+<button class="ham" id="ham" aria-label="Open navigation menu"><span class="material-icons-round">menu</span></button>
+<div class="sb-overlay" id="sb-ov"></div>
+
+<aside class="sidebar" id="sidebar" role="navigation" aria-label="Sidebar navigation">
+  <div class="sb-brand">
+    <div class="logo">D</div>
+    <h1>DataFlow</h1>
+  </div>
+  <div class="sb-scroll">
+    <div class="sb-section">
+      <div class="ni active" data-view="dashboard" title="Dashboard">
+        <span class="material-icons-round">dashboard</span><span class="ni-label">Dashboard</span>
+      </div>
+      <div class="ni" data-view="vault" title="Vault">
+        <span class="material-icons-round">lock</span><span class="ni-label">Vault</span>
+      </div>
+    </div>
+    <div class="sb-section" id="sb-admin-section" style="display:none">
+      <div class="sb-label">Admin</div>
+      <div class="ni" data-view="members" title="Members">
+        <span class="material-icons-round">group</span><span class="ni-label">Members</span>
+      </div>
+      <div class="ni" data-view="audit" title="Audit Log">
+        <span class="material-icons-round">history</span><span class="ni-label">Audit Log</span>
+      </div>
+    </div>
+    <div class="sb-section">
+      <div class="sb-label">Categories</div>
+      <div class="cat-list" id="cat-list"></div>
+    </div>
+  </div>
+  <div class="sb-bottom">
+    <div class="ni" data-view="settings" title="Settings">
+      <span class="material-icons-round">settings</span><span class="ni-label">Settings</span>
+    </div>
+    <div class="sb-user" id="sb-user">
+      <div class="sb-avatar" id="sb-avatar">U</div>
+      <span id="sb-user-name">User</span>
+      <button class="btn-icon" id="sb-logout-btn" title="Sign out" aria-label="Sign out" style="margin-left:auto">
+        <span class="material-icons-round" style="font-size:18px">logout</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<div class="main-area">
+  <div class="topbar">
+    <div class="search-box">
+      <span class="material-icons-round search-icon">search</span>
+      <input type="text" id="search-input" placeholder="Search vault... (press /)" aria-label="Search vault">
+    </div>
+    <div class="topbar-actions">
+      <button class="topbar-btn" id="btn-lock" title="Lock vault (L)" aria-label="Lock vault">
+        <span class="material-icons-round">lock</span>
+      </button>
+      <button class="topbar-btn" id="btn-notifications" title="Notifications" aria-label="Notifications">
+        <span class="material-icons-round">notifications_none</span>
+      </button>
+      <button class="topbar-btn" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">
+        <span class="material-icons-round">dark_mode</span>
+      </button>
+    </div>
+  </div>
+
+  <main class="content" id="ct" role="main">
+    <div id="view-container"></div>
+  </main>
+</div>
+
+<!-- Item Editor Modal -->
+<div class="modal-overlay" id="modal-item-editor" role="dialog" aria-modal="true" aria-label="Edit item">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-item-title">New Item</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <div id="modal-item-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-item-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-item-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Password Generator Modal -->
+<div class="modal-overlay" id="modal-pwgen" role="dialog" aria-modal="true" aria-label="Password Generator">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Password Generator</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <div id="pwgen-body">
+      <div class="pw-gen-output" id="pwgen-output"></div>
+      <div class="form-group">
+        <label for="pwgen-length">Length: <span id="pwgen-length-val">16</span></label>
+        <input type="range" id="pwgen-length" class="pw-gen-slider" min="8" max="128" value="16" aria-label="Password length">
+      </div>
+      <div class="pw-gen-toggles">
+        <div class="pw-gen-toggle"><label><input type="checkbox" id="pwgen-upper" checked> Uppercase</label></div>
+        <div class="pw-gen-toggle"><label><input type="checkbox" id="pwgen-lower" checked> Lowercase</label></div>
+        <div class="pw-gen-toggle"><label><input type="checkbox" id="pwgen-numbers" checked> Numbers</label></div>
+        <div class="pw-gen-toggle"><label><input type="checkbox" id="pwgen-symbols" checked> Symbols</label></div>
+      </div>
+      <div class="pw-strength"><div class="pw-strength-bar" id="pwgen-strength"></div></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="pwgen-regen">Regenerate</button>
+      <button class="btn btn-primary" id="pwgen-copy">Copy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="modal-overlay" id="modal-confirm" role="dialog" aria-modal="true" aria-label="Confirm action">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="confirm-title">Confirm</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <p id="confirm-message" style="margin-bottom:16px;color:var(--tx2)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="confirm-cancel">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Onboarding Modal -->
+<div class="onboarding-overlay" id="modal-onboarding" role="dialog" aria-modal="true" aria-label="Welcome to DataFlow">
+  <div class="onboarding-box">
+    <div class="onboarding-step" id="onboarding-step">
+      <span class="material-icons-round" style="font-size:48px;color:var(--brand);margin-bottom:12px">shield</span>
+      <h2>Welcome to DataFlow</h2>
+      <p>Your secure family data vault. Store passwords, documents, and sensitive information — encrypted and private.</p>
+    </div>
+    <div class="modal-actions" style="justify-content:center;border:none;padding:0;margin-top:16px">
+      <button class="btn btn-primary" id="onboarding-next">Get Started</button>
+    </div>
+  </div>
+</div>
+
+<!-- Help Overlay -->
+<div class="help-overlay" id="help-overlay">
+  <div class="help-box">
+    <h3 class="help-title">Keyboard Shortcuts</h3>
+    <div class="help-row"><span>New item</span><kbd>N</kbd></div>
+    <div class="help-row"><span>Search</span><kbd>/</kbd></div>
+    <div class="help-row"><span>Lock vault</span><kbd>L</kbd></div>
+    <div class="help-row"><span>Show help</span><kbd>?</kbd></div>
+    <div class="help-row"><span>Close modal</span><kbd>Esc</kbd></div>
+    <div style="margin-top:16px;text-align:center">
+      <button class="btn btn-secondary" id="help-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lock Screen -->
+<div class="lock-overlay" id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-icon"><span class="material-icons-round" style="font-size:48px">lock</span></div>
+    <h2 class="lock-title">Vault Locked</h2>
+    <p class="lock-subtitle">Enter your master password to unlock</p>
+    <div class="form-group">
+      <input type="password" id="lock-password" class="form-input" placeholder="Master password" aria-label="Master password to unlock vault">
+    </div>
+    <button class="btn btn-primary" id="lock-unlock" style="width:100%">Unlock</button>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container" role="alert" aria-live="polite"></div>
+
+<script src="/store.js"></script>
+<script type="module" src="/js/utils.js"></script>
+<script type="module" src="/js/api.js"></script>
+<script type="module" src="/app.js"></script>
+
+</body>
+</html>

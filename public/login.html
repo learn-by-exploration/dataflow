@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataFlow — Sign In</title>
+<meta name="theme-color" content="#1a73e8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a73e8'/><text x='16' y='23' font-size='18' font-weight='bold' text-anchor='middle' fill='white'>D</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#F8FAFC;color:#0F172A;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.auth-container{width:100%;max-width:420px;padding:20px}
+.auth-logo{text-align:center;margin-bottom:32px}
+.auth-logo .logo{display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:#1a73e8;border-radius:14px;font-size:28px;font-weight:700;color:#fff;margin-bottom:12px}
+.auth-logo h1{font-size:24px;font-weight:600}
+.auth-logo p{font-size:14px;color:#64748B;margin-top:4px}
+.auth-card{background:#FFFFFF;border-radius:12px;padding:28px;border:1px solid #E2E8F0;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.auth-tabs{display:flex;margin-bottom:24px;background:#F1F5F9;border-radius:8px;padding:3px}
+.auth-tab{flex:1;padding:10px 8px;text-align:center;font-size:14px;font-weight:500;color:#64748B;cursor:pointer;border-radius:6px;transition:all .2s;min-height:44px;display:flex;align-items:center;justify-content:center}
+.auth-tab.active{background:#FFFFFF;color:#0F172A;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.auth-field{margin-bottom:16px}
+.auth-field label{display:block;font-size:13px;font-weight:500;color:#475569;margin-bottom:6px}
+.auth-field input{width:100%;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;color:#0F172A;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+.auth-field input:focus{border-color:#1a73e8}
+.auth-field input::placeholder{color:#94A3B8}
+.auth-btn{width:100%;padding:12px;background:#1a73e8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .2s;min-height:44px}
+.auth-btn:hover{background:#1557b0}
+.auth-btn:disabled{opacity:.5;cursor:not-allowed}
+.auth-error{background:#fef2f2;color:#dc2626;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none;border:1px solid #fecaca}
+.auth-error.show{display:block}
+.auth-footer{text-align:center;margin-top:24px;font-size:13px;color:#64748B}
+.auth-footer a{color:#1a73e8;text-decoration:none}
+.auth-footer a:hover{text-decoration:underline}
+.pw-wrap{position:relative}
+.pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748B;cursor:pointer;font-size:18px;padding:4px}
+@media(prefers-color-scheme:dark){
+  body{background:#0F172A;color:#F1F5F9}
+  .auth-logo h1{color:#F1F5F9}
+  .auth-logo p{color:#94A3B8}
+  .auth-card{background:#1E293B;border-color:#334155;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+  .auth-tabs{background:#0F172A}
+  .auth-tab{color:#94A3B8}
+  .auth-tab.active{background:#334155;color:#F1F5F9;box-shadow:none}
+  .auth-field label{color:#94A3B8}
+  .auth-field input{background:#0F172A;border-color:#334155;color:#F1F5F9}
+  .auth-field input::placeholder{color:#64748B}
+  .auth-error{background:#450a0a;color:#fca5a5;border-color:#7f1d1d}
+  .auth-footer{color:#94A3B8}
+  .pw-toggle{color:#94A3B8}
+}
+</style>
+</head>
+<body>
+<div class="auth-container">
+  <div class="auth-logo">
+    <div class="logo">D</div>
+    <h1>DataFlow</h1>
+    <p>Secure Family Data Vault</p>
+  </div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <div class="auth-tab active" data-tab="login">Sign In</div>
+      <div class="auth-tab" data-tab="register">Create Account</div>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+
+    <!-- Login Form -->
+    <form id="login-form">
+      <div class="auth-field">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="auth-field">
+        <label for="login-password">Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password" required>
+          <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><span class="material-icons-round" style="font-size:18px">visibility_off</span></button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="login-master">Master Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="login-master" placeholder="Your master password" autocomplete="off" required>
+          <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><span class="material-icons-round" style="font-size:18px">visibility_off</span></button>
+        </div>
+      </div>
+      <button type="submit" class="auth-btn">Sign In</button>
+    </form>
+
+    <!-- Register Form (hidden by default) -->
+    <form id="register-form" style="display:none">
+      <div class="auth-field">
+        <label for="reg-name">Display Name</label>
+        <input type="text" id="reg-name" placeholder="Your name" autocomplete="name" required>
+      </div>
+      <div class="auth-field">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="auth-field">
+        <label for="reg-password">Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="reg-password" placeholder="Choose a password" autocomplete="new-password" required>
+          <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><span class="material-icons-round" style="font-size:18px">visibility_off</span></button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="reg-master">Master Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="reg-master" placeholder="Choose a master password" autocomplete="off" required>
+          <button type="button" class="pw-toggle" aria-label="Toggle password visibility"><span class="material-icons-round" style="font-size:18px">visibility_off</span></button>
+        </div>
+      </div>
+      <button type="submit" class="auth-btn">Create Account</button>
+    </form>
+  </div>
+  <div class="auth-footer">
+    <a href="/landing.html">Learn more about DataFlow</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+  const tabs = document.querySelectorAll('.auth-tab');
+  const loginForm = document.getElementById('login-form');
+  const registerForm = document.getElementById('register-form');
+  const errorEl = document.getElementById('auth-error');
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      tabs.forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      errorEl.classList.remove('show');
+      if (tab.dataset.tab === 'login') {
+        loginForm.style.display = '';
+        registerForm.style.display = 'none';
+      } else {
+        loginForm.style.display = 'none';
+        registerForm.style.display = '';
+      }
+    });
+  });
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.classList.add('show');
+  }
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrf_token=([a-f0-9]{64})/);
+    return m ? m[1] : '';
+  }
+
+  loginForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    errorEl.classList.remove('show');
+    var btn = loginForm.querySelector('.auth-btn');
+    btn.disabled = true;
+    try {
+      var res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrf() },
+        body: JSON.stringify({
+          email: document.getElementById('login-email').value,
+          password: document.getElementById('login-password').value,
+          master_password: document.getElementById('login-master').value
+        })
+      });
+      var data = await res.json().catch(function() { return {}; });
+      if (!res.ok) {
+        showError(data.error || 'Sign in failed');
+        return;
+      }
+      window.location.href = '/';
+    } catch (err) {
+      showError('Network error — please try again');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  registerForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    errorEl.classList.remove('show');
+    var btn = registerForm.querySelector('.auth-btn');
+    btn.disabled = true;
+    try {
+      var res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrf() },
+        body: JSON.stringify({
+          display_name: document.getElementById('reg-name').value,
+          email: document.getElementById('reg-email').value,
+          password: document.getElementById('reg-password').value,
+          master_password: document.getElementById('reg-master').value
+        })
+      });
+      var data = await res.json().catch(function() { return {}; });
+      if (!res.ok) {
+        showError(data.error || 'Registration failed');
+        return;
+      }
+      window.location.href = '/';
+    } catch (err) {
+      showError('Network error — please try again');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Password toggle
+  document.querySelectorAll('.pw-toggle').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var input = btn.parentElement.querySelector('input');
+      var icon = btn.querySelector('.material-icons-round');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility';
+      } else {
+        input.type = 'password';
+        icon.textContent = 'visibility_off';
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

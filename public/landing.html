@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataFlow — Secure Family Data Vault</title>
+<meta name="theme-color" content="#1a73e8">
+<meta name="description" content="DataFlow: A secure, self-hosted family data vault for passwords, documents, and sensitive information.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/landing.css">
+</head>
+<body>
+<nav class="ln-nav">
+  <div class="ln-nav-inner">
+    <div class="ln-brand"><span class="ln-logo">D</span> DataFlow</div>
+    <div class="ln-links">
+      <a href="#features">Features</a>
+      <a href="#get-started">Get Started</a>
+      <a href="/login.html" class="ln-cta">Sign In</a>
+    </div>
+  </div>
+</nav>
+
+<header class="ln-hero">
+  <h1>Your family's data,<br>secured by <em>you</em>.</h1>
+  <p class="ln-sub">DataFlow is a self-hosted, encrypted data vault for passwords, documents, and sensitive family information. No cloud, no subscriptions — your data stays on your machine.</p>
+  <div class="ln-actions">
+    <a href="/login.html" class="ln-btn primary">Get Started</a>
+    <a href="#features" class="ln-btn secondary">Learn More</a>
+  </div>
+</header>
+
+<section id="features" class="ln-section">
+  <h2>Built for families. Built for security.</h2>
+  <div class="ln-grid">
+    <div class="ln-card">
+      <div class="ln-icon">🔐</div>
+      <h3>End-to-End Encryption</h3>
+      <p>AES-256-GCM encryption with Argon2 key derivation. Your data is encrypted at rest and only decrypted in memory.</p>
+    </div>
+    <div class="ln-card">
+      <div class="ln-icon">👨‍👩‍👧‍👦</div>
+      <h3>Family Roles</h3>
+      <p>Admin, adult, and child roles. Share specific items or categories with family members securely.</p>
+    </div>
+    <div class="ln-card">
+      <div class="ln-icon">📋</div>
+      <h3>Flexible Record Types</h3>
+      <p>Passwords, credit cards, notes, identities, medical records — built-in and custom record types.</p>
+    </div>
+    <div class="ln-card">
+      <div class="ln-icon">🔑</div>
+      <h3>Password Generator</h3>
+      <p>Generate strong passwords or memorable passphrases. Configurable length, character sets, and separators.</p>
+    </div>
+    <div class="ln-card">
+      <div class="ln-icon">📊</div>
+      <h3>Audit Trail</h3>
+      <p>Every action is logged. Know who accessed what, when, and from where — full accountability.</p>
+    </div>
+    <div class="ln-card">
+      <div class="ln-icon">🏠</div>
+      <h3>Self-Hosted</h3>
+      <p>Run on your own hardware. SQLite-backed, single binary, no external dependencies. Fully offline-capable.</p>
+    </div>
+  </div>
+</section>
+
+<section id="get-started" class="ln-section ln-section-alt">
+  <h2>Get Started in 30 Seconds</h2>
+  <div class="ln-steps">
+    <div class="ln-step">
+      <div class="ln-step-num">1</div>
+      <h3>Clone &amp; Install</h3>
+      <code>git clone &amp;&amp; cd dataflow &amp;&amp; npm install</code>
+    </div>
+    <div class="ln-step">
+      <div class="ln-step-num">2</div>
+      <h3>Start the Server</h3>
+      <code>npm start</code>
+    </div>
+    <div class="ln-step">
+      <div class="ln-step-num">3</div>
+      <h3>Open in Browser</h3>
+      <code>http://localhost:3460</code>
+    </div>
+  </div>
+  <p class="ln-note">Requires Node.js 22+. No external services needed.</p>
+</section>
+
+<footer class="ln-footer">
+  <p>DataFlow — Secure Family Data Vault</p>
+</footer>
+</body>
+</html>
