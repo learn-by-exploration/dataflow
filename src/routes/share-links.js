@@ -36,7 +36,7 @@ module.exports = function createShareLinkRoutes(db) {
     } catch (err) { next(err); }
   });
 
-  // GET /api/share-links/:token — resolve share link (unauthenticated)
+  // GET /api/share-links/:token — resolve share link without passphrase (unauthenticated)
   router.get('/:token', (req, res, next) => {
     try {
       const { token } = req.params;
@@ -44,7 +44,33 @@ module.exports = function createShareLinkRoutes(db) {
         return res.status(400).json({ error: 'Invalid token' });
       }
 
-      const passphrase = req.query.passphrase || null;
+      const result = service.resolveShareLink(token, null);
+
+      if (result.error) {
+        const statusMap = {
+          not_found: 404,
+          expired: 410,
+          already_used: 410,
+          passphrase_required: 401,
+          wrong_passphrase: 403,
+          item_not_found: 404,
+        };
+        return res.status(statusMap[result.error] || 400).json({ error: result.error });
+      }
+
+      res.json({ item: result.item });
+    } catch (err) { next(err); }
+  });
+
+  // POST /api/share-links/:token/resolve — resolve share link with passphrase in body (unauthenticated)
+  router.post('/:token/resolve', (req, res, next) => {
+    try {
+      const { token } = req.params;
+      if (!token || token.length !== 64) {
+        return res.status(400).json({ error: 'Invalid token' });
+      }
+
+      const passphrase = (req.body && req.body.passphrase) || null;
       const result = service.resolveShareLink(token, passphrase);
 
       if (result.error) {

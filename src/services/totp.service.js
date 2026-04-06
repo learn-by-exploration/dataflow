@@ -125,7 +125,7 @@ function verifyCode(code, secret, options = {}) {
   for (let i = -1; i <= 1; i++) {
     const ts = now + i * period * 1000;
     const expected = generateCode(secret, ts, options);
-    if (code === expected) return true;
+    if (code.length === expected.length && crypto.timingSafeEqual(Buffer.from(code, 'utf8'), Buffer.from(expected, 'utf8'))) return true;
   }
   return false;
 }

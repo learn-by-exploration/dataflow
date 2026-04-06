@@ -1,11 +1,19 @@
 services:
   dataflow:
     build: .
+    container_name: dataflow
     ports:
       - "3460:3460"
     volumes:
       - ./data:/app/data
-    restart: unless-stopped
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - DB_DIR=/app/data
+      - PORT=3460
+      - TRUST_PROXY=1
+    restart: always
+    read_only: true
     tmpfs:
       - /tmp
     security_opt:

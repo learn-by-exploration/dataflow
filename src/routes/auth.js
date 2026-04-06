@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const config = require('../config');
+const crypto = require('crypto');
 const validate = require('../middleware/validate');
 const { registerSchema, loginSchema, changePasswordSchema } = require('../schemas/auth.schema');
 const createAuthService = require('../services/auth.service');
@@ -164,7 +165,7 @@ module.exports = function createAuthRoutes({ db, audit }) {
 
     const result = sessions.map(s => ({
       sid: s.sid.slice(0, 8) + '…',
-      sid_full: s.sid,
+      ref: crypto.createHash('sha256').update(s.sid).digest('hex').slice(0, 16),
       created_at: s.created_at,
       expires_at: s.expires_at,
       is_current: s.sid === currentSid,
@@ -173,19 +174,23 @@ module.exports = function createAuthRoutes({ db, audit }) {
     res.json(result);
   });
 
-  // ─── DELETE /api/auth/sessions/:sid — revoke a specific session ───
-  router.delete('/api/auth/sessions/:sid', requireAuth, (req, res) => {
-    const targetSid = req.params.sid;
+  // ─── DELETE /api/auth/sessions/:ref — revoke a specific session by ref ───
+  router.delete('/api/auth/sessions/:ref', requireAuth, (req, res) => {
+    const targetRef = req.params.ref;
 
-    if (targetSid === req.sessionId) {
+    // Find the session matching this ref
+    const sessions = sessionRepo.findByUserId(req.userId);
+    const target = sessions.find(s => crypto.createHash('sha256').update(s.sid).digest('hex').slice(0, 16) === targetRef);
+
+    if (!target) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (target.sid === req.sessionId) {
       return res.status(400).json({ error: 'Cannot revoke current session' });
     }
 
-    const result = sessionRepo.deleteSessionBySid(targetSid, req.userId);
-
-    if (result.changes === 0) {
-      return res.status(404).json({ error: 'Session not found' });
-    }
+    sessionRepo.deleteSessionBySid(target.sid, req.userId);
 
     audit.log({
       userId: req.userId,
@@ -300,12 +305,12 @@ module.exports = function createAuthRoutes({ db, audit }) {
 
       const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(401).json({ error: 'Recovery failed' });
       }
 
       const used = await recoveryService.useCode(user.id, recovery_code);
       if (!used) {
-        return res.status(401).json({ error: 'Invalid or already used recovery code' });
+        return res.status(401).json({ error: 'Recovery failed' });
       }
 
       // Reset the password
@@ -336,9 +341,10 @@ module.exports = function createAuthRoutes({ db, audit }) {
         resourceId: user.id,
         ip: req.ip,
         ua: req.headers['user-agent'],
+        detail: 'data_loss: new vault key generated, all encrypted items unrecoverable',
       });
 
-      res.json({ ok: true });
+      res.json({ ok: true, warning: 'All previously encrypted vault data is now unrecoverable. A new empty vault key was generated.' });
     } catch (err) { next(err); }
   });
 

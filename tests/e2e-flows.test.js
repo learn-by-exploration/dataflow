@@ -224,7 +224,8 @@ describe('#90: E2E user journey flows', () => {
     const sessRes = await request(app).get('/api/auth/sessions').set('Cookie', `df_sid=${sid2}`).expect(200);
     assert.ok(sessRes.body.length >= 2);
 
-    await request(app).delete(`/api/auth/sessions/${sid1}`).set('Cookie', `df_sid=${sid2}`).expect(200);
+    const otherSession = sessRes.body.find(s => !s.is_current);
+    await request(app).delete(`/api/auth/sessions/${otherSession.ref}`).set('Cookie', `df_sid=${sid2}`).expect(200);
   });
 
   it('Flow 13: Create record type → Add fields → Create item', async () => {

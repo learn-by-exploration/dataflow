@@ -2888,14 +2888,14 @@ function openPrintView(itemsData, opts = {}) {
     <button class="no-print toggle-pw" onclick="document.querySelectorAll('.masked').forEach(el=>{el.classList.toggle('masked');el.dataset.v=el.dataset.v==='1'?'0':'1'})">Toggle Passwords</button>`;
 
   for (const [catName, catItems] of Object.entries(grouped)) {
-    html += `<h3>${catName}</h3>`;
+    html += `<h3>${esc(catName)}</h3>`;
     for (const item of catItems) {
-      html += `<div class="item"><div class="item-title">${item.title || 'Untitled'}</div>`;
+      html += `<div class="item"><div class="item-title">${esc(item.title || 'Untitled')}</div>`;
       for (const f of (item.fields || [])) {
         const val = f.field_type === 'password' && !showPasswords ? '••••••••' : (f.value || f.decrypted_value || '');
-        html += `<div class="field"><span class="field-lbl">${f.field_name || f.name || ''}</span>: <span class="${f.field_type === 'password' && !showPasswords ? 'masked' : ''}">${val}</span></div>`;
+        html += `<div class="field"><span class="field-lbl">${esc(f.field_name || f.name || '')}</span>: <span class="${f.field_type === 'password' && !showPasswords ? 'masked' : ''}">${esc(val)}</span></div>`;
       }
-      if (item.notes) html += `<div class="field"><span class="field-lbl">Notes</span>: ${item.notes}</div>`;
+      if (item.notes) html += `<div class="field"><span class="field-lbl">Notes</span>: ${esc(item.notes)}</div>`;
       html += `</div>`;
     }
   }

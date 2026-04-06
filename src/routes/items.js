@@ -118,16 +118,18 @@ module.exports = function createItemRoutes(db, sessionVault) {
     } catch (err) { next(err); }
   });
 
+  const bulkEditSchema = z.object({
+    itemIds: z.array(z.number().int().positive()).min(1).max(500),
+    changes: z.object({
+      category_id: z.number().int().positive().optional(),
+      record_type_id: z.number().int().positive().optional(),
+    }).refine(obj => Object.keys(obj).length > 0, { message: 'At least one change required' }),
+  });
+
   // PUT /api/items/bulk/edit — BEFORE /:id
-  router.put('/bulk/edit', (req, res, next) => {
+  router.put('/bulk/edit', validate({ body: bulkEditSchema }), (req, res, next) => {
     try {
       const { itemIds, changes } = req.body;
-      if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
-        return res.status(400).json({ error: 'itemIds array is required' });
-      }
-      if (!changes || typeof changes !== 'object' || Object.keys(changes).length === 0) {
-        return res.status(400).json({ error: 'changes object is required' });
-      }
       const count = service.bulkEdit(req.userId, itemIds, changes);
       res.json({ ok: true, count });
     } catch (err) { next(err); }

@@ -1,7 +1,7 @@
 # DataFlow — Claude Code Configuration
 
-> **Last updated:** 6 April 2026 · **Version:** 0.3.0
-> **Metrics:** 1287 tests | 60 test files | 21 DB tables | ~13000 LOC
+> **Last updated:** 7 April 2026 · **Version:** 0.3.1
+> **Metrics:** 1331 tests | 61 test files | 21 DB tables | ~13100 LOC
 
 ## Project Overview
 
@@ -433,7 +433,7 @@ npm run test:fast           # Skip performance tests
 | Version bump | CLAUDE.md header, `package.json`, `docs/openapi.yaml` |
 
 **Update the CLAUDE.md header line counts** when LOC changes significantly (>5%):
-- **Current:** 1287 tests | 60 test files | 21 tables | ~13000 LOC
+- **Current:** 1331 tests | 61 test files | 21 tables | ~13100 LOC
 
 ## Roadmap
 

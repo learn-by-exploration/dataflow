@@ -5,6 +5,25 @@ All notable changes to DataFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-04-07
+
+### Fixed
+- **CRITICAL:** Auth middleware cookie mismatch — production `__Host-df_sid` cookie was never read (always read `df_sid`)
+- **CRITICAL:** Stored XSS in print view — unescaped user data in `openPrintView()` (titles, fields, notes)
+- **CRITICAL:** Full session tokens leaked in `GET /api/auth/sessions` (`sid_full` field) — replaced with SHA-256 ref
+- **HIGH:** Recovery endpoint generated new vault key without warning user about permanent data loss
+- **HIGH:** Share-link passphrase transmitted in URL query parameter — moved to POST body
+- **MEDIUM:** `/api/metrics` endpoint accessible without authentication — restricted to localhost
+- **MEDIUM:** Recovery endpoint leaked user existence via different error messages — unified to generic error
+- **MEDIUM:** TOTP verification used non-constant-time string comparison — switched to `crypto.timingSafeEqual`
+- **MEDIUM:** Bulk edit route accepted arbitrary change fields without validation — added Zod schema whitelist
+- **MEDIUM:** CSRF middleware blocked recovery endpoint for unauthenticated users — added exemption
+- **MEDIUM:** Rate limiter in security routes used custom keyGenerator with IPv6 issue — removed custom keyGenerator
+
+### Changed
+- Docker: `restart: always` (auto-start on boot), `read_only: true`, named container, explicit env vars
+- Tests: 1,308 → 1,331 (17 new review-fix tests)
+
 ## [0.3.0] — 2026-04-06
 
 ### Added — Batch 2: Security Hardening

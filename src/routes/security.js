@@ -23,7 +23,6 @@ module.exports = function createSecurityRoutes(db) {
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.userId || req.ip,
     message: { error: 'Too many breach check requests, please try again later' },
   });
 

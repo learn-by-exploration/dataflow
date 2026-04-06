@@ -11,7 +11,7 @@ function createCsrfMiddleware() {
     }
 
     // Auth endpoints exempt from CSRF (login/register use password as proof)
-    if (req.path === '/auth/login' || req.path === '/auth/register' || req.path === '/auth/logout') {
+    if (req.path === '/auth/login' || req.path === '/auth/register' || req.path === '/auth/logout' || req.path === '/auth/recover') {
       ensureTokenCookie(req, res);
       return next();
     }

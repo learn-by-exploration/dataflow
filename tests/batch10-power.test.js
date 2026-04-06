@@ -338,10 +338,10 @@ describe('Batch 10 — Power Features', () => {
         .expect(201);
       // Without passphrase
       await request(app).get(`/api/share-links/${create.body.token}`).expect(401);
-      // With wrong passphrase
-      await request(app).get(`/api/share-links/${create.body.token}?passphrase=wrong`).expect(403);
-      // With correct passphrase
-      const res = await request(app).get(`/api/share-links/${create.body.token}?passphrase=secret123`).expect(200);
+      // With wrong passphrase via POST
+      await request(app).post(`/api/share-links/${create.body.token}/resolve`).send({ passphrase: 'wrong' }).expect(403);
+      // With correct passphrase via POST
+      const res = await request(app).post(`/api/share-links/${create.body.token}/resolve`).send({ passphrase: 'secret123' }).expect(200);
       assert.ok(res.body.item);
     });
 

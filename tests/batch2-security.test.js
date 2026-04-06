@@ -43,7 +43,7 @@ describe('Batch 2 — Security Hardening', () => {
       assert.ok(res.body.length >= 2, 'Should show at least 2 sessions');
     });
 
-    it('DELETE /api/auth/sessions/:sid revokes a specific session', async () => {
+    it('DELETE /api/auth/sessions/:ref revokes a specific session', async () => {
       const user = await makeUser(app);
       const login = await loginUser(app, user);
 
@@ -51,19 +51,23 @@ describe('Batch 2 — Security Hardening', () => {
       const list = await authRequest(app, login.sid).get('/api/auth/sessions').expect(200);
       const other = list.body.find(s => !s.is_current);
       assert.ok(other, 'Should have a non-current session');
+      assert.ok(other.ref, 'Should have a ref field');
+      assert.ok(!other.sid_full, 'Should NOT have sid_full');
 
-      // Revoke the register session
-      await authRequest(app, login.sid).delete(`/api/auth/sessions/${other.sid_full}`).expect(200);
+      // Revoke the register session by ref
+      await authRequest(app, login.sid).delete(`/api/auth/sessions/${other.ref}`).expect(200);
 
       // Verify revoked session is gone
       const list2 = await authRequest(app, login.sid).get('/api/auth/sessions').expect(200);
-      const gone = list2.body.find(s => s.sid_full === other.sid_full);
+      const gone = list2.body.find(s => s.ref === other.ref);
       assert.ok(!gone, 'Revoked session should be removed');
     });
 
-    it('DELETE /api/auth/sessions/:sid cannot revoke current session', async () => {
+    it('DELETE /api/auth/sessions/:ref cannot revoke current session', async () => {
       const user = await makeUser(app);
-      const res = await authRequest(app, user.sid).delete(`/api/auth/sessions/${user.sid}`).expect(400);
+      const list = await authRequest(app, user.sid).get('/api/auth/sessions').expect(200);
+      const current = list.body.find(s => s.is_current);
+      const res = await authRequest(app, user.sid).delete(`/api/auth/sessions/${current.ref}`).expect(400);
       assert.match(res.body.error, /current/i);
     });
 

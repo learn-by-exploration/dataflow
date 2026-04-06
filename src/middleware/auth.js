@@ -8,7 +8,7 @@ function createAuthMiddleware(db) {
   const authRepo = createAuthRepo(db);
 
   function requireAuth(req, res, next) {
-    const sid = req.cookies && req.cookies.df_sid;
+    const sid = req.cookies && (req.cookies['__Host-df_sid'] || req.cookies.df_sid);
     if (!sid) {
       return res.status(401).json({ error: 'Authentication required' });
     }
@@ -31,7 +31,7 @@ function createAuthMiddleware(db) {
   }
 
   function optionalAuth(req, res, next) {
-    const sid = req.cookies && req.cookies.df_sid;
+    const sid = req.cookies && (req.cookies['__Host-df_sid'] || req.cookies.df_sid);
     if (!sid) return next();
 
     const session = sessionRepo.findValidSession(sid);

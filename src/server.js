@@ -213,7 +213,11 @@ app.post('/api/csp-report', cspLimiter, express.json({ type: 'application/csp-re
 app.use('/api/health', require('./routes/health')(db));
 
 // ─── Metrics (no auth required, separate mount) ───
-app.get('/api/metrics', (_req, res) => {
+app.get('/api/metrics', (req, res) => {
+  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
+  if (!isLocal) {
+    return res.status(403).json({ error: 'Metrics only accessible from localhost' });
+  }
   try {
     const text = formatMetrics(db);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -225,7 +229,7 @@ app.get('/api/metrics', (_req, res) => {
 
 // ─── Apply auth middleware to remaining /api/* routes ───
 app.use('/api', (req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/health' || req.path.startsWith('/health/') || req.path === '/metrics' || req.path === '/csp-report' || (req.method === 'GET' && req.path.startsWith('/share-links/'))) return next();
+  if (req.path.startsWith('/auth/') || req.path === '/health' || req.path.startsWith('/health/') || req.path === '/metrics' || req.path === '/csp-report' || (req.method === 'GET' && req.path.startsWith('/share-links/')) || (req.method === 'POST' && req.path.match(/^\/share-links\/[^/]+\/resolve$/))) return next();
   requireAuth(req, res, next);
 });
 
