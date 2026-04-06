@@ -15,6 +15,12 @@ function createCategoryRepo(db) {
       return row;
     },
 
+    findByIdRaw(id) {
+      const row = db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+      if (!row) throw new NotFoundError('Category', id);
+      return row;
+    },
+
     create(userId, { name, icon, color, position }) {
       const pos = position != null ? position : getNextPosition(db, 'categories', 'user_id', userId);
       const result = db.prepare(

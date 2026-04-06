@@ -31,7 +31,7 @@ function createAttachmentService(db, audit) {
   }
 
   return {
-    upload(userId, itemId, file, vaultKey) {
+    async upload(userId, itemId, file, vaultKey) {
       if (!file) throw new ValidationError('No file provided');
       if (file.size > config.maxAttachmentSize) {
         throw new ValidationError(`File too large. Maximum size is ${Math.floor(config.maxAttachmentSize / 1024 / 1024)}MB`);
@@ -44,7 +44,7 @@ function createAttachmentService(db, audit) {
       const attachDir = getAttachmentsDir();
       const encPath = path.join(attachDir, filename);
 
-      const { iv, tag } = encryptFile(file.path, encPath, vaultKey);
+      const { iv, tag } = await encryptFile(file.path, encPath, vaultKey);
 
       // Remove temp upload file
       try { fs.unlinkSync(file.path); } catch { /* ignore */ }
@@ -67,14 +67,14 @@ function createAttachmentService(db, audit) {
       return attachment;
     },
 
-    download(id, userId, vaultKey) {
+    async download(id, userId, vaultKey) {
       const attachment = repo.findByIdAndUser(id, userId);
       const attachDir = getAttachmentsDir();
       const encPath = path.join(attachDir, attachment.filename);
       const tmpPath = path.join(attachDir, `tmp_${crypto.randomUUID()}`);
 
       try {
-        decryptFile(encPath, tmpPath, attachment.encryption_iv, attachment.encryption_tag, vaultKey);
+        await decryptFile(encPath, tmpPath, attachment.encryption_iv, attachment.encryption_tag, vaultKey);
       } catch (err) {
         try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
         throw err;

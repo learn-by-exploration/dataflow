@@ -19,7 +19,10 @@ const {
   unwrapVaultKey,
   encryptFile,
   decryptFile,
+  encryptFileSync,
+  decryptFileSync,
   zeroBuffer,
+  computeSortKey,
 } = require('../src/services/encryption');
 
 describe('Encryption Service', () => {
@@ -161,8 +164,37 @@ describe('Encryption Service', () => {
     assert.throws(() => unwrapVaultKey(wrapped, k2));
   });
 
-  // ─── File encryption ───
-  describe('File encryption', () => {
+  // ─── Sort key computation ───
+  it('computeSortKey is deterministic (same title + same key = same hash)', () => {
+    const key = crypto.randomBytes(32);
+    const h1 = computeSortKey('My Title', key);
+    const h2 = computeSortKey('My Title', key);
+    assert.equal(h1, h2);
+  });
+
+  it('computeSortKey differs for different titles', () => {
+    const key = crypto.randomBytes(32);
+    const h1 = computeSortKey('Alpha', key);
+    const h2 = computeSortKey('Beta', key);
+    assert.notEqual(h1, h2);
+  });
+
+  it('computeSortKey differs for different keys', () => {
+    const k1 = crypto.randomBytes(32);
+    const k2 = crypto.randomBytes(32);
+    const h1 = computeSortKey('Same Title', k1);
+    const h2 = computeSortKey('Same Title', k2);
+    assert.notEqual(h1, h2);
+  });
+
+  it('computeSortKey returns hex string', () => {
+    const key = crypto.randomBytes(32);
+    const h = computeSortKey('test', key);
+    assert.match(h, /^[a-f0-9]{64}$/);
+  });
+
+  // ─── File encryption (sync, legacy) ───
+  describe('File encryption (sync)', () => {
     let tmpDir;
 
     before(() => {
@@ -180,7 +212,7 @@ describe('Encryption Service', () => {
       const outPath = path.join(tmpDir, 'output.txt');
 
       fs.writeFileSync(inputPath, 'File content for encryption test');
-      const { iv, tag } = encryptFile(inputPath, encPath, key);
+      const { iv, tag } = encryptFileSync(inputPath, encPath, key);
       assert.ok(iv);
       assert.ok(tag);
 
@@ -189,7 +221,7 @@ describe('Encryption Service', () => {
       const origData = fs.readFileSync(inputPath);
       assert.notDeepEqual(encData, origData);
 
-      decryptFile(encPath, outPath, iv, tag, key);
+      decryptFileSync(encPath, outPath, iv, tag, key);
       const result = fs.readFileSync(outPath, 'utf8');
       assert.equal(result, 'File content for encryption test');
     });
@@ -201,14 +233,14 @@ describe('Encryption Service', () => {
       const outPath = path.join(tmpDir, 'tamper-out.txt');
 
       fs.writeFileSync(inputPath, 'sensitive data');
-      const { iv, tag } = encryptFile(inputPath, encPath, key);
+      const { iv, tag } = encryptFileSync(inputPath, encPath, key);
 
       // Tamper with encrypted file
       const data = fs.readFileSync(encPath);
       data[0] = data[0] ^ 0xff;
       fs.writeFileSync(encPath, data);
 
-      assert.throws(() => decryptFile(encPath, outPath, iv, tag, key));
+      assert.throws(() => decryptFileSync(encPath, outPath, iv, tag, key));
     });
 
     it('encrypts binary file', () => {
@@ -219,10 +251,83 @@ describe('Encryption Service', () => {
 
       const binaryData = crypto.randomBytes(1024);
       fs.writeFileSync(inputPath, binaryData);
-      const { iv, tag } = encryptFile(inputPath, encPath, key);
-      decryptFile(encPath, outPath, iv, tag, key);
+      const { iv, tag } = encryptFileSync(inputPath, encPath, key);
+      decryptFileSync(encPath, outPath, iv, tag, key);
       const result = fs.readFileSync(outPath);
       assert.deepEqual(result, binaryData);
+    });
+  });
+
+  // ─── File encryption (streaming) ───
+  describe('File encryption (streaming)', () => {
+    let tmpDir;
+
+    before(() => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'df-enc-stream-'));
+    });
+
+    after(() => {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('streaming encrypt → decrypt round-trip produces identical content', async () => {
+      const key = crypto.randomBytes(32);
+      const inputPath = path.join(tmpDir, 'stream-in.txt');
+      const encPath = path.join(tmpDir, 'stream.enc');
+      const outPath = path.join(tmpDir, 'stream-out.txt');
+
+      fs.writeFileSync(inputPath, 'Streaming encryption test content');
+      const { iv, tag } = await encryptFile(inputPath, encPath, key);
+      assert.ok(iv);
+      assert.ok(tag);
+
+      await decryptFile(encPath, outPath, iv, tag, key);
+      const result = fs.readFileSync(outPath, 'utf8');
+      assert.equal(result, 'Streaming encryption test content');
+    });
+
+    it('streams 1MB file without issues', async () => {
+      const key = crypto.randomBytes(32);
+      const inputPath = path.join(tmpDir, 'large-in.bin');
+      const encPath = path.join(tmpDir, 'large.enc');
+      const outPath = path.join(tmpDir, 'large-out.bin');
+
+      const largeData = crypto.randomBytes(1024 * 1024); // 1MB
+      fs.writeFileSync(inputPath, largeData);
+      const { iv, tag } = await encryptFile(inputPath, encPath, key);
+      await decryptFile(encPath, outPath, iv, tag, key);
+      const result = fs.readFileSync(outPath);
+      assert.deepEqual(result, largeData);
+    });
+
+    it('encrypted file is not identical to original', async () => {
+      const key = crypto.randomBytes(32);
+      const inputPath = path.join(tmpDir, 'diff-in.txt');
+      const encPath = path.join(tmpDir, 'diff.enc');
+
+      fs.writeFileSync(inputPath, 'plaintext data for comparison');
+      await encryptFile(inputPath, encPath, key);
+
+      const origData = fs.readFileSync(inputPath);
+      const encData = fs.readFileSync(encPath);
+      assert.notDeepEqual(encData, origData);
+    });
+
+    it('tampered encrypted file fails decryption (auth tag mismatch)', async () => {
+      const key = crypto.randomBytes(32);
+      const inputPath = path.join(tmpDir, 'tamper-stream-in.txt');
+      const encPath = path.join(tmpDir, 'tamper-stream.enc');
+      const outPath = path.join(tmpDir, 'tamper-stream-out.txt');
+
+      fs.writeFileSync(inputPath, 'Integrity check data');
+      const { iv, tag } = await encryptFile(inputPath, encPath, key);
+
+      // Tamper with encrypted file
+      const data = fs.readFileSync(encPath);
+      data[0] = data[0] ^ 0xff;
+      fs.writeFileSync(encPath, data);
+
+      await assert.rejects(() => decryptFile(encPath, outPath, iv, tag, key));
     });
   });
 

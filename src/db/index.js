@@ -39,6 +39,7 @@ function initDatabase(dbDir) {
       master_key_salt TEXT,
       master_key_params TEXT,
       vault_key_encrypted TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -114,6 +115,7 @@ function initDatabase(dbDir) {
       notes_tag TEXT,
       favorite INTEGER NOT NULL DEFAULT 0,
       position INTEGER DEFAULT 0,
+      title_sort_key TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -218,12 +220,26 @@ function initDatabase(dbDir) {
     CREATE INDEX IF NOT EXISTS idx_item_attachments_item ON item_attachments(item_id);
     CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id);
     CREATE INDEX IF NOT EXISTS idx_item_shares_item ON item_shares(item_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_item_shares_unique ON item_shares(item_id, shared_with);
     CREATE INDEX IF NOT EXISTS idx_category_shares_category ON category_shares(category_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_category_shares_unique ON category_shares(category_id, shared_with);
     CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
   `);
 
-  // Run migrations
+  // Run migrations (for existing databases that need schema updates)
+  // For new databases, the schema already includes all changes, so we pre-record them.
+  const isNew = db.prepare('SELECT COUNT(*) as c FROM users').get().c === 0
+    && db.prepare("SELECT COUNT(*) as c FROM _migrations").get().c === 0;
+  if (isNew) {
+    // Pre-record all migrations since the schema is already up to date
+    const migrationsDir = path.join(__dirname, 'migrations');
+    if (fs.existsSync(migrationsDir)) {
+      const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+      const stmt = db.prepare('INSERT OR IGNORE INTO _migrations (name) VALUES (?)');
+      for (const file of files) stmt.run(file);
+    }
+  }
   runMigrations(db);
 
   return db;

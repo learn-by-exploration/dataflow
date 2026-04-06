@@ -195,6 +195,44 @@ describe('Sharing', () => {
       it('non-shared user cannot GET item', async () => {
         await memberApi.get(`/api/items/${item.id}`).expect(404);
       });
+
+      it('shared item returns decrypted fields when owner is online', async () => {
+        // Admin created item with title 'Secret Item' and is logged in
+        await adminApi.post(`/api/items/${item.id}/share`)
+          .send({ user_id: member.id, permission: 'read' })
+          .expect(201);
+
+        const res = await memberApi.get(`/api/items/${item.id}`).expect(200);
+        assert.equal(res.body.shared, true);
+        assert.equal(res.body.title, 'Secret Item');
+        assert.equal(res.body.encrypted, undefined, 'Should not have encrypted flag when owner online');
+      });
+
+      it('shared item returns error when owner vault is locked', async () => {
+        await adminApi.post(`/api/items/${item.id}/share`)
+          .send({ user_id: member.id, permission: 'read' })
+          .expect(201);
+
+        // Logout admin to lock vault
+        await adminApi.post('/api/auth/logout').expect(200);
+
+        const res = await memberApi.get(`/api/items/${item.id}`).expect(200);
+        assert.equal(res.body.shared, true);
+        assert.equal(res.body.encrypted, true);
+        assert.match(res.body.error, /vault is locked/i);
+        assert.equal(res.body.title, undefined, 'Should not expose encrypted title');
+      });
+
+      it('shared item respects read/write permissions in response', async () => {
+        await adminApi.post(`/api/items/${item.id}/share`)
+          .send({ user_id: member.id, permission: 'write' })
+          .expect(201);
+
+        const res = await memberApi.get(`/api/items/${item.id}`).expect(200);
+        assert.equal(res.body.shared, true);
+        assert.equal(res.body.permission, 'write');
+        assert.equal(res.body.title, 'Secret Item');
+      });
     });
 
     describe('GET /api/shared/items', () => {

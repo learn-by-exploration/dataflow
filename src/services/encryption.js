@@ -92,13 +92,13 @@ function unwrapVaultKey(wrapped, derivedKey) {
 }
 
 /**
- * Encrypt a file with AES-256-GCM.
+ * Encrypt a file with AES-256-GCM (sync, legacy).
  * @param {string} inputPath
  * @param {string} outputPath
  * @param {Buffer} key
  * @returns {{ iv: string, tag: string }}
  */
-function encryptFile(inputPath, outputPath, key) {
+function encryptFileSync(inputPath, outputPath, key) {
   const fs = require('fs');
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -113,20 +113,74 @@ function encryptFile(inputPath, outputPath, key) {
 }
 
 /**
- * Decrypt a file with AES-256-GCM.
+ * Decrypt a file with AES-256-GCM (sync, legacy).
  * @param {string} inputPath
  * @param {string} outputPath
  * @param {string} iv - hex
  * @param {string} tag - hex
  * @param {Buffer} key
  */
-function decryptFile(inputPath, outputPath, iv, tag, key) {
+function decryptFileSync(inputPath, outputPath, iv, tag, key) {
   const fs = require('fs');
   const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'));
   decipher.setAuthTag(Buffer.from(tag, 'hex'));
   const input = fs.readFileSync(inputPath);
   const decrypted = Buffer.concat([decipher.update(input), decipher.final()]);
   fs.writeFileSync(outputPath, decrypted);
+}
+
+/**
+ * Encrypt a file with AES-256-GCM using streams.
+ * @param {string} inputPath
+ * @param {string} outputPath
+ * @param {Buffer} key
+ * @returns {Promise<{ iv: string, tag: string }>}
+ */
+function encryptFile(inputPath, outputPath, key) {
+  const fs = require('fs');
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+
+  const input = fs.createReadStream(inputPath);
+  const output = fs.createWriteStream(outputPath);
+
+  return new Promise((resolve, reject) => {
+    input.on('error', reject);
+    output.on('error', reject);
+    input.pipe(cipher).pipe(output);
+    output.on('finish', () => {
+      resolve({
+        iv: iv.toString('hex'),
+        tag: cipher.getAuthTag().toString('hex'),
+      });
+    });
+  });
+}
+
+/**
+ * Decrypt a file with AES-256-GCM using streams.
+ * @param {string} inputPath
+ * @param {string} outputPath
+ * @param {string} iv - hex
+ * @param {string} tag - hex
+ * @param {Buffer} key
+ * @returns {Promise<void>}
+ */
+function decryptFile(inputPath, outputPath, iv, tag, key) {
+  const fs = require('fs');
+  const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'));
+  decipher.setAuthTag(Buffer.from(tag, 'hex'));
+
+  const input = fs.createReadStream(inputPath);
+  const output = fs.createWriteStream(outputPath);
+
+  return new Promise((resolve, reject) => {
+    input.on('error', reject);
+    output.on('error', reject);
+    decipher.on('error', reject);
+    input.pipe(decipher).pipe(output);
+    output.on('finish', resolve);
+  });
 }
 
 /**
@@ -139,6 +193,16 @@ function zeroBuffer(buf) {
   }
 }
 
+/**
+ * Compute a deterministic sort key using HMAC-SHA256.
+ * @param {string} plaintext
+ * @param {Buffer} key - 32-byte key
+ * @returns {string} hex-encoded HMAC
+ */
+function computeSortKey(plaintext, key) {
+  return crypto.createHmac('sha256', key).update(plaintext).digest('hex');
+}
+
 module.exports = {
   encrypt,
   decrypt,
@@ -148,5 +212,8 @@ module.exports = {
   unwrapVaultKey,
   encryptFile,
   decryptFile,
+  encryptFileSync,
+  decryptFileSync,
   zeroBuffer,
+  computeSortKey,
 };

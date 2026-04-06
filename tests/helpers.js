@@ -43,6 +43,9 @@ function cleanDb() {
   db.exec('DELETE FROM login_attempts');
   db.exec('DELETE FROM sessions');
   db.exec('DELETE FROM users');
+  // Clear in-memory session vault to prevent stale vault keys across tests
+  const sessionVault = require('../src/services/session-vault');
+  sessionVault.clearAll();
 }
 
 function teardown() {

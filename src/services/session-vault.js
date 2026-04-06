@@ -15,7 +15,7 @@ class SessionVault {
    */
   setVaultKey(sid, vaultKey, userId) {
     this._store.set(sid, {
-      vaultKey,
+      vaultKey: Buffer.from(vaultKey),  // clone to prevent caller's zeroBuffer from destroying our copy
       lastActivity: Date.now(),
       userId,
     });
@@ -35,6 +35,21 @@ class SessionVault {
   }
 
   /**
+   * Get vault key by user ID (finds any active session for that user).
+   * @param {number} userId
+   * @returns {Buffer|null}
+   */
+  getVaultKeyByUserId(userId) {
+    for (const entry of this._store.values()) {
+      if (entry.userId === userId && entry.vaultKey && !entry.vaultKey.every(b => b === 0)) {
+        entry.lastActivity = Date.now();
+        return entry.vaultKey;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Clear vault key for a session (zeros memory).
    * @param {string} sid
    */
@@ -43,6 +58,19 @@ class SessionVault {
     if (entry) {
       zeroBuffer(entry.vaultKey);
       this._store.delete(sid);
+    }
+  }
+
+  /**
+   * Clear all vault keys for a user (zeros memory, deletes entries).
+   * @param {number} userId
+   */
+  clearByUserId(userId) {
+    for (const [sid, entry] of this._store.entries()) {
+      if (entry.userId === userId) {
+        zeroBuffer(entry.vaultKey);
+        this._store.delete(sid);
+      }
     }
   }
 

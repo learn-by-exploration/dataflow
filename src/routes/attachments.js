@@ -51,23 +51,23 @@ module.exports = function createAttachmentRoutes(db, sessionVault) {
   });
 
   // POST /api/items/:itemId/attachments
-  router.post('/items/:itemId/attachments', upload.single('file'), validate({ params: itemIdParam }), (req, res, next) => {
+  router.post('/items/:itemId/attachments', upload.single('file'), validate({ params: itemIdParam }), async (req, res, next) => {
     try {
       const vaultKey = getVaultKey(req, res);
       if (!vaultKey) return;
       // Verify item belongs to user
       itemRepo.findById(req.params.itemId, req.userId);
-      const attachment = service.upload(req.userId, req.params.itemId, req.file, vaultKey);
+      const attachment = await service.upload(req.userId, req.params.itemId, req.file, vaultKey);
       res.status(201).json(attachment);
     } catch (err) { next(err); }
   });
 
   // GET /api/attachments/:id
-  router.get('/attachments/:id', validate({ params: idParam }), (req, res, next) => {
+  router.get('/attachments/:id', validate({ params: idParam }), async (req, res, next) => {
     try {
       const vaultKey = getVaultKey(req, res);
       if (!vaultKey) return;
-      const { attachment, decryptedPath } = service.download(req.params.id, req.userId, vaultKey);
+      const { attachment, decryptedPath } = await service.download(req.params.id, req.userId, vaultKey);
       // Sanitize filename: strip directory traversal, control chars, and quotes
       const safeName = (attachment.original_name || 'download')
         .replace(/[/\\]/g, '_')

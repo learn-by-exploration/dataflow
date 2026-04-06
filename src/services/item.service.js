@@ -3,7 +3,7 @@
 const createItemRepo = require('../repositories/item.repository');
 const createItemFieldRepo = require('../repositories/item-field.repository');
 const createTagRepo = require('../repositories/tag.repository');
-const { encrypt, decrypt } = require('./encryption');
+const { encrypt, decrypt, computeSortKey } = require('./encryption');
 
 function createItemService(db, audit) {
   const itemRepo = createItemRepo(db);
@@ -32,6 +32,7 @@ function createItemService(db, audit) {
     create(userId, vaultKey, { title, notes, category_id, record_type_id, fields, tags, favorite }) {
       const titleEnc = encryptField(title, vaultKey);
       const notesEnc = notes ? encryptField(notes, vaultKey) : {};
+      const titleSortKey = computeSortKey(title, vaultKey);
 
       const txn = db.transaction(() => {
         const item = itemRepo.create(userId, {
@@ -44,6 +45,7 @@ function createItemService(db, audit) {
           notes_iv: notesEnc.value_iv || null,
           notes_tag: notesEnc.value_tag || null,
           favorite: favorite || false,
+          title_sort_key: titleSortKey,
         });
 
         if (fields && fields.length > 0) {
@@ -107,6 +109,7 @@ function createItemService(db, audit) {
           updateData.title_encrypted = enc.value_encrypted;
           updateData.title_iv = enc.value_iv;
           updateData.title_tag = enc.value_tag;
+          updateData.title_sort_key = computeSortKey(data.title, vaultKey);
         }
 
         if (data.notes !== undefined) {

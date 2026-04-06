@@ -29,7 +29,7 @@ function createItemRepo(db) {
       let orderBy = 'i.position ASC, i.id DESC';
       if (sort === 'created') orderBy = 'i.created_at DESC, i.id DESC';
       else if (sort === 'updated') orderBy = 'i.updated_at DESC, i.id DESC';
-      else if (sort === 'title') orderBy = 'i.title_encrypted ASC';
+      else if (sort === 'title') orderBy = 'i.title_sort_key ASC, i.id ASC';
 
       let sql = `SELECT i.* FROM items i WHERE ${conditions.join(' AND ')} ORDER BY ${orderBy}`;
       if (limit != null) {
@@ -54,8 +54,8 @@ function createItemRepo(db) {
       const pos = data.position != null ? data.position : getNextPosition(db, 'items', 'user_id', userId);
       const result = db.prepare(
         `INSERT INTO items (user_id, category_id, record_type_id, title_encrypted, title_iv, title_tag,
-         notes_encrypted, notes_iv, notes_tag, favorite, position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         notes_encrypted, notes_iv, notes_tag, favorite, position, title_sort_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         userId,
         data.category_id,
@@ -63,7 +63,8 @@ function createItemRepo(db) {
         data.title_encrypted, data.title_iv, data.title_tag,
         data.notes_encrypted || null, data.notes_iv || null, data.notes_tag || null,
         data.favorite ? 1 : 0,
-        pos
+        pos,
+        data.title_sort_key || null
       );
       return this.findById(result.lastInsertRowid, userId);
     },
@@ -73,7 +74,7 @@ function createItemRepo(db) {
       const fields = [];
       const values = [];
       for (const key of ['category_id', 'record_type_id', 'title_encrypted', 'title_iv', 'title_tag',
-        'notes_encrypted', 'notes_iv', 'notes_tag', 'favorite', 'position']) {
+        'notes_encrypted', 'notes_iv', 'notes_tag', 'favorite', 'position', 'title_sort_key']) {
         if (data[key] !== undefined) {
           fields.push(`${key} = ?`);
           values.push(key === 'favorite' ? (data[key] ? 1 : 0) : data[key]);
@@ -115,6 +116,25 @@ function createItemRepo(db) {
 
     countByUser(userId) {
       return db.prepare('SELECT COUNT(*) as count FROM items WHERE user_id = ?').get(userId).count;
+    },
+
+    existsForUser(id, userId) {
+      return !!db.prepare('SELECT id FROM items WHERE id = ? AND user_id = ?').get(id, userId);
+    },
+
+    findByIdRaw(id) {
+      return db.prepare('SELECT * FROM items WHERE id = ?').get(id) || null;
+    },
+
+    updatePartial(id, fieldValues) {
+      const ALLOWED_COLUMNS = ['favorite', 'category_id', 'title', 'title_encrypted', 'title_sort_key', 'notes', 'notes_encrypted', 'position'];
+      const keys = Object.keys(fieldValues).filter(k => ALLOWED_COLUMNS.includes(k));
+      if (keys.length === 0) return;
+      const setClauses = keys.map(k => `${k} = ?`);
+      setClauses.push("updated_at = datetime('now')");
+      const values = keys.map(k => fieldValues[k]);
+      values.push(id);
+      db.prepare(`UPDATE items SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
     },
   };
 }

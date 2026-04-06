@@ -9,12 +9,16 @@ const { createCategorySchema, updateCategorySchema } = require('../schemas/categ
 const { shareItemSchema } = require('../schemas/sharing.schema');
 const { idParam, reorderSchema } = require('../schemas/common.schema');
 const { NotFoundError, ForbiddenError } = require('../errors');
+const createCategoryRepo = require('../repositories/category.repository');
+const createAuthRepo = require('../repositories/auth.repository');
 
 module.exports = function createCategoryRoutes(db) {
   const router = Router();
   const audit = createAuditLogger(db);
   const service = createCategoryService(db, audit);
   const sharingRepo = createSharingRepo(db);
+  const categoryRepo = createCategoryRepo(db);
+  const authRepo = createAuthRepo(db);
 
   // GET /api/categories
   router.get('/', (req, res, next) => {
@@ -72,15 +76,14 @@ module.exports = function createCategoryRoutes(db) {
       const catId = req.params.id;
       const { user_id: sharedWith, permission } = req.body;
 
-      const cat = db.prepare('SELECT id, user_id FROM categories WHERE id = ?').get(catId);
-      if (!cat) throw new NotFoundError('Category', catId);
+      const cat = categoryRepo.findByIdRaw(catId);
       if (cat.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can share categories');
       }
       if (sharedWith === cat.user_id) {
         return res.status(400).json({ error: 'Cannot share a category with its owner' });
       }
-      const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(sharedWith);
+      const targetUser = authRepo.findUserBasic(sharedWith);
       if (!targetUser) throw new NotFoundError('User', sharedWith);
 
       const share = sharingRepo.shareCategory(catId, req.userId, sharedWith, permission);
@@ -104,8 +107,7 @@ module.exports = function createCategoryRoutes(db) {
       const catId = Number(req.params.id);
       const shareUserId = Number(req.params.shareUserId);
 
-      const cat = db.prepare('SELECT id, user_id FROM categories WHERE id = ?').get(catId);
-      if (!cat) throw new NotFoundError('Category', catId);
+      const cat = categoryRepo.findByIdRaw(catId);
       if (cat.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can revoke shares');
       }
@@ -119,8 +121,7 @@ module.exports = function createCategoryRoutes(db) {
   router.get('/:id/shares', (req, res, next) => {
     try {
       const catId = Number(req.params.id);
-      const cat = db.prepare('SELECT id, user_id FROM categories WHERE id = ?').get(catId);
-      if (!cat) throw new NotFoundError('Category', catId);
+      const cat = categoryRepo.findByIdRaw(catId);
       if (cat.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can view shares');
       }

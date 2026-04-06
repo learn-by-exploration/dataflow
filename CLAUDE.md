@@ -1,7 +1,7 @@
 # DataFlow — Claude Code Configuration
 
-> **Last updated:** 5 April 2026 · **Version:** 0.1.0
-> **Metrics:** 770 tests | 45 test files | 17 DB tables | ~7200 LOC
+> **Last updated:** 6 April 2026 · **Version:** 0.2.0
+> **Metrics:** 838 tests | 49 test files | 17 DB tables | ~7600 LOC
 
 ## Project Overview
 

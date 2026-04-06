@@ -187,4 +187,19 @@ describe('CSRF Protection', () => {
     middleware(req, res, () => {});
     assert.equal(cookieHeader, undefined, 'Should not reset existing CSRF cookie');
   });
+
+  it('CSRF cookie is not HttpOnly (required for double-submit pattern)', () => {
+    const createCsrfMiddleware = require('../src/middleware/csrf');
+    const middleware = createCsrfMiddleware();
+    const req = { method: 'GET', cookies: {}, path: '/test', headers: {} };
+    let cookieHeader;
+    const res = {
+      getHeader: () => undefined,
+      setHeader: (name, value) => { if (name === 'Set-Cookie') cookieHeader = value; },
+    };
+    middleware(req, res, () => {});
+    assert.ok(cookieHeader, 'Should set CSRF cookie');
+    const cookieStr = Array.isArray(cookieHeader) ? cookieHeader.join('; ') : String(cookieHeader);
+    assert.ok(!cookieStr.includes('HttpOnly'), 'CSRF cookie must NOT be HttpOnly so JS can read it for double-submit');
+  });
 });

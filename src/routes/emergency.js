@@ -9,6 +9,10 @@ module.exports = function createEmergencyRoutes(db) {
   const router = Router();
   const repo = createEmergencyRepo(db);
   const audit = createAuditLogger(db);
+  const createAuthRepo = require('../repositories/auth.repository');
+  const createSettingsRepo = require('../repositories/settings.repository');
+  const authRepo = createAuthRepo(db);
+  const settingsRepo = createSettingsRepo(db);
 
   // POST /request — request emergency access
   router.post('/request', (req, res, next) => {
@@ -18,12 +22,11 @@ module.exports = function createEmergencyRoutes(db) {
 
       if (grantor_id === req.userId) throw new ForbiddenError('Cannot request access to your own vault');
 
-      const grantor = db.prepare('SELECT id FROM users WHERE id = ?').get(grantor_id);
+      const grantor = authRepo.findUserBasic(grantor_id);
       if (!grantor) throw new NotFoundError('User', grantor_id);
 
       // Get wait_days from grantor settings (default 3)
-      const setting = db.prepare('SELECT value FROM settings WHERE user_id = ? AND key = ?')
-        .get(grantor_id, 'emergency_wait_days');
+      const setting = settingsRepo.findByKey(grantor_id, 'emergency_wait_days');
       const waitDays = setting ? parseInt(setting.value, 10) : 3;
 
       const request = repo.create(grantor_id, req.userId, waitDays);

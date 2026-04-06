@@ -31,6 +31,10 @@ module.exports = function createItemRoutes(db, sessionVault) {
   const audit = createAuditLogger(db);
   const service = createItemService(db, audit);
   const sharingRepo = createSharingRepo(db);
+  const createItemRepo = require('../repositories/item.repository');
+  const createAuthRepo = require('../repositories/auth.repository');
+  const itemRepo = createItemRepo(db);
+  const authRepo = createAuthRepo(db);
 
   function getVaultKey(req, res) {
     const vaultKey = sessionVault.getVaultKey(req.sessionId);
@@ -101,8 +105,6 @@ module.exports = function createItemRoutes(db, sessionVault) {
   // PUT /api/items/reorder — BEFORE /:id
   router.put('/reorder', validate({ body: reorderItemsSchema }), (req, res, next) => {
     try {
-      const createItemRepo = require('../repositories/item.repository');
-      const itemRepo = createItemRepo(db);
       itemRepo.reorder(req.userId, req.body.category_id, req.body.ids);
       res.json({ ok: true });
     } catch (err) { next(err); }
@@ -115,8 +117,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
       if (!vaultKey) return;
 
       // Try as owner first
-      const own = db.prepare('SELECT id FROM items WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
-      if (own) {
+      if (itemRepo.existsForUser(req.params.id, req.userId)) {
         const item = service.findById(req.params.id, req.userId, vaultKey);
         return res.json(item);
       }
@@ -124,9 +125,30 @@ module.exports = function createItemRoutes(db, sessionVault) {
       // Check if shared
       const shared = sharingRepo.isItemSharedWith(req.params.id, req.userId);
       if (shared) {
-        const item = db.prepare('SELECT * FROM items WHERE id = ?').get(req.params.id);
+        const item = itemRepo.findByIdRaw(req.params.id);
         if (!item) throw new NotFoundError('Item', req.params.id);
-        return res.json({ ...item, shared: true, permission: shared.permission });
+
+        // Try to decrypt using the owner's vault key
+        const ownerVaultKey = sessionVault.getVaultKeyByUserId(item.user_id);
+        if (ownerVaultKey) {
+          const decrypted = service.findById(req.params.id, item.user_id, ownerVaultKey);
+          return res.json({ ...decrypted, shared: true, permission: shared.permission });
+        }
+        // Owner offline — cannot decrypt
+        return res.json({
+          id: item.id,
+          user_id: item.user_id,
+          category_id: item.category_id,
+          record_type_id: item.record_type_id,
+          favorite: item.favorite,
+          position: item.position,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          shared: true,
+          permission: shared.permission,
+          encrypted: true,
+          error: "Owner's vault is locked. Item cannot be decrypted.",
+        });
       }
 
       throw new NotFoundError('Item', req.params.id);
@@ -140,8 +162,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
       if (!vaultKey) return;
 
       // Try as owner
-      const own = db.prepare('SELECT id FROM items WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
-      if (own) {
+      if (itemRepo.existsForUser(req.params.id, req.userId)) {
         const item = service.update(req.params.id, req.userId, vaultKey, req.body);
         return res.json(item);
       }
@@ -149,24 +170,19 @@ module.exports = function createItemRoutes(db, sessionVault) {
       // Check shared with write
       const shared = sharingRepo.isItemSharedWith(req.params.id, req.userId);
       if (shared && shared.permission === 'write') {
-        const item = db.prepare('SELECT * FROM items WHERE id = ?').get(req.params.id);
+        const item = itemRepo.findByIdRaw(req.params.id);
         if (!item) throw new NotFoundError('Item', req.params.id);
-        const fields = [];
-        const values = [];
+        const updates = {};
         if (req.body.favorite !== undefined) {
-          fields.push('favorite = ?');
-          values.push(req.body.favorite ? 1 : 0);
+          updates.favorite = req.body.favorite ? 1 : 0;
         }
         if (req.body.category_id !== undefined) {
-          fields.push('category_id = ?');
-          values.push(req.body.category_id);
+          updates.category_id = req.body.category_id;
         }
-        if (fields.length > 0) {
-          fields.push("updated_at = datetime('now')");
-          values.push(req.params.id);
-          db.prepare(`UPDATE items SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+        if (Object.keys(updates).length > 0) {
+          itemRepo.updatePartial(req.params.id, updates);
         }
-        const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(req.params.id);
+        const updated = itemRepo.findByIdRaw(req.params.id);
         return res.json({ ...updated, shared: true, permission: 'write' });
       }
 
@@ -206,7 +222,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
       const itemId = req.params.id;
       const { user_id: sharedWith, permission } = req.body;
 
-      const item = db.prepare('SELECT id, user_id FROM items WHERE id = ?').get(itemId);
+      const item = itemRepo.findByIdRaw(itemId);
       if (!item) throw new NotFoundError('Item', itemId);
       if (item.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can share items');
@@ -214,7 +230,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
       if (sharedWith === item.user_id) {
         return res.status(400).json({ error: 'Cannot share an item with its owner' });
       }
-      const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(sharedWith);
+      const targetUser = authRepo.findUserBasic(sharedWith);
       if (!targetUser) throw new NotFoundError('User', sharedWith);
 
       const share = sharingRepo.shareItem(itemId, req.userId, sharedWith, permission);
@@ -238,7 +254,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
       const itemId = Number(req.params.id);
       const shareUserId = Number(req.params.shareUserId);
 
-      const item = db.prepare('SELECT id, user_id FROM items WHERE id = ?').get(itemId);
+      const item = itemRepo.findByIdRaw(itemId);
       if (!item) throw new NotFoundError('Item', itemId);
       if (item.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can revoke shares');
@@ -253,7 +269,7 @@ module.exports = function createItemRoutes(db, sessionVault) {
   router.get('/:id/shares', (req, res, next) => {
     try {
       const itemId = Number(req.params.id);
-      const item = db.prepare('SELECT id, user_id FROM items WHERE id = ?').get(itemId);
+      const item = itemRepo.findByIdRaw(itemId);
       if (!item) throw new NotFoundError('Item', itemId);
       if (item.user_id !== req.userId && req.userRole !== 'admin') {
         throw new ForbiddenError('Only the owner or admin can view shares');
