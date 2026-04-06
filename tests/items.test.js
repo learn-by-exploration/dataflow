@@ -229,7 +229,13 @@ describe('Items', () => {
         fields: [{ field_def_id: rtFields[0].id, value: 'val' }],
       });
 
+      // Soft delete preserves fields (for restore)
       itemService.delete(item.id, user.id);
+      const afterSoft = fieldRepo.findByItem(item.id);
+      assert.ok(afterSoft.length > 0, 'Fields should survive soft delete');
+
+      // Permanent delete cascades
+      itemRepo.permanentlyDelete(item.id);
       const remaining = fieldRepo.findByItem(item.id);
       assert.equal(remaining.length, 0);
     });
@@ -246,7 +252,13 @@ describe('Items', () => {
         tags: [tag.id],
       });
 
+      // Soft delete preserves tags (for restore)
       itemService.delete(item.id, user.id);
+      const afterSoft = tagRepo.findByItem(item.id);
+      assert.ok(afterSoft.length > 0, 'Tags should survive soft delete');
+
+      // Permanent delete cascades
+      itemRepo.permanentlyDelete(item.id);
       const tags = tagRepo.findByItem(item.id);
       assert.equal(tags.length, 0);
     });

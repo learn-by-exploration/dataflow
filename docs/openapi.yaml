@@ -1,0 +1,1163 @@
+openapi: 3.0.3
+info:
+  title: DataFlow API
+  description: Secure, self-hosted family data vault API
+  version: 0.2.0
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3460
+    description: Development server
+
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      tags: [Health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  uptime:
+                    type: number
+
+  /api/metrics:
+    get:
+      summary: Prometheus metrics
+      tags: [Health]
+      responses:
+        '200':
+          description: Prometheus exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, master_password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                master_password:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '201':
+          description: User registered
+
+  /api/auth/login:
+    post:
+      summary: Log in
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, master_password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                master_password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+
+  /api/auth/logout:
+    post:
+      summary: Log out
+      tags: [Auth]
+      responses:
+        '200':
+          description: Logged out
+
+  /api/auth/session:
+    get:
+      summary: Get current session info
+      tags: [Auth]
+      responses:
+        '200':
+          description: Session info
+
+  /api/auth/password:
+    put:
+      summary: Change password
+      tags: [Auth]
+      responses:
+        '200':
+          description: Password changed
+
+  /api/auth/sessions:
+    get:
+      summary: List active sessions
+      tags: [Auth]
+      responses:
+        '200':
+          description: List of sessions
+    delete:
+      summary: Revoke all other sessions
+      tags: [Auth]
+      responses:
+        '200':
+          description: Sessions revoked
+
+  /api/auth/sessions/{sid}:
+    delete:
+      summary: Revoke a session
+      tags: [Auth]
+      parameters:
+        - name: sid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session revoked
+
+  /api/auth/rotate-vault-key:
+    post:
+      summary: Rotate vault encryption key
+      tags: [Auth]
+      responses:
+        '200':
+          description: Vault key rotated
+
+  /api/auth/recovery-codes/generate:
+    post:
+      summary: Generate recovery codes
+      tags: [Auth]
+      responses:
+        '200':
+          description: Recovery codes generated
+
+  /api/auth/recovery-codes/status:
+    get:
+      summary: Get recovery codes status
+      tags: [Auth]
+      responses:
+        '200':
+          description: Recovery codes status
+
+  /api/auth/recover:
+    post:
+      summary: Recover account with recovery code
+      tags: [Auth]
+      responses:
+        '200':
+          description: Account recovered
+
+  /api/csp-report:
+    post:
+      summary: CSP violation report
+      tags: [Security]
+      responses:
+        '204':
+          description: Report accepted
+
+  /api/categories:
+    get:
+      summary: List categories
+      tags: [Categories]
+      responses:
+        '200':
+          description: List of categories
+    post:
+      summary: Create a category
+      tags: [Categories]
+      responses:
+        '201':
+          description: Category created
+
+  /api/categories/reorder:
+    put:
+      summary: Reorder categories
+      tags: [Categories]
+      responses:
+        '200':
+          description: Categories reordered
+
+  /api/categories/{id}:
+    get:
+      summary: Get a category
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category details
+    put:
+      summary: Update a category
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category updated
+    delete:
+      summary: Delete a category
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category deleted
+
+  /api/categories/{id}/share:
+    post:
+      summary: Share a category
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category shared
+
+  /api/categories/{id}/share/{shareUserId}:
+    delete:
+      summary: Unshare a category
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: shareUserId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Category unshared
+
+  /api/categories/{id}/shares:
+    get:
+      summary: List category shares
+      tags: [Categories]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of shares
+
+  /api/record-types:
+    get:
+      summary: List record types
+      tags: [Record Types]
+      responses:
+        '200':
+          description: List of record types
+    post:
+      summary: Create a record type
+      tags: [Record Types]
+      responses:
+        '201':
+          description: Record type created
+
+  /api/record-types/{id}:
+    get:
+      summary: Get a record type
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Record type details
+    put:
+      summary: Update a record type
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Record type updated
+    delete:
+      summary: Delete a record type
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Record type deleted
+
+  /api/record-types/{id}/fields:
+    post:
+      summary: Add a field to a record type
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Field added
+
+  /api/record-types/{id}/fields/reorder:
+    put:
+      summary: Reorder fields
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Fields reordered
+
+  /api/record-types/{id}/fields/{fieldId}:
+    put:
+      summary: Update a field
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Field updated
+    delete:
+      summary: Delete a field
+      tags: [Record Types]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Field deleted
+
+  /api/items:
+    get:
+      summary: List items
+      tags: [Items]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of items
+    post:
+      summary: Create an item
+      tags: [Items]
+      responses:
+        '201':
+          description: Item created
+
+  /api/items/reindex:
+    post:
+      summary: Reindex full-text search
+      tags: [Items]
+      responses:
+        '200':
+          description: Reindex complete
+
+  /api/items/bulk:
+    post:
+      summary: Bulk create items
+      tags: [Items]
+      responses:
+        '201':
+          description: Items created
+
+  /api/items/count:
+    get:
+      summary: Get item count
+      tags: [Items]
+      responses:
+        '200':
+          description: Item count
+
+  /api/items/recent:
+    get:
+      summary: List recent items
+      tags: [Items]
+      responses:
+        '200':
+          description: Recent items
+
+  /api/items/reorder:
+    put:
+      summary: Reorder items
+      tags: [Items]
+      responses:
+        '200':
+          description: Items reordered
+
+  /api/items/trash:
+    get:
+      summary: List trashed items
+      tags: [Items]
+      responses:
+        '200':
+          description: Trashed items
+    delete:
+      summary: Empty trash
+      tags: [Items]
+      responses:
+        '200':
+          description: Trash emptied
+
+  /api/items/bulk/tags:
+    post:
+      summary: Bulk tag items
+      tags: [Items]
+      responses:
+        '200':
+          description: Tags applied
+
+  /api/items/{id}:
+    get:
+      summary: Get an item
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item details
+    put:
+      summary: Update an item
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item updated
+    delete:
+      summary: Delete an item (soft delete)
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item deleted
+
+  /api/items/{id}/restore:
+    post:
+      summary: Restore item from trash
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item restored
+
+  /api/items/{id}/favorite:
+    post:
+      summary: Toggle favorite
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Favorite toggled
+    put:
+      summary: Set favorite status
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Favorite set
+
+  /api/items/{id}/copy:
+    post:
+      summary: Copy an item
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '201':
+          description: Item copied
+
+  /api/items/{id}/history:
+    get:
+      summary: Get item history
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item history
+
+  /api/items/{id}/share:
+    post:
+      summary: Share an item
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item shared
+
+  /api/items/{id}/share/{shareUserId}:
+    delete:
+      summary: Unshare an item
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: shareUserId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item unshared
+
+  /api/items/{id}/shares:
+    get:
+      summary: List item shares
+      tags: [Items]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of shares
+
+  /api/items/{itemId}/attachments:
+    get:
+      summary: List item attachments
+      tags: [Attachments]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of attachments
+    post:
+      summary: Upload an attachment
+      tags: [Attachments]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Attachment uploaded
+
+  /api/attachments/{id}:
+    get:
+      summary: Download an attachment
+      tags: [Attachments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attachment data
+    delete:
+      summary: Delete an attachment
+      tags: [Attachments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Attachment deleted
+
+  /api/tags:
+    get:
+      summary: List tags
+      tags: [Tags]
+      responses:
+        '200':
+          description: List of tags
+    post:
+      summary: Create a tag
+      tags: [Tags]
+      responses:
+        '201':
+          description: Tag created
+
+  /api/tags/usage:
+    get:
+      summary: Get tag usage counts
+      tags: [Tags]
+      responses:
+        '200':
+          description: Tag usage
+
+  /api/tags/{id}:
+    put:
+      summary: Update a tag
+      tags: [Tags]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag updated
+    delete:
+      summary: Delete a tag
+      tags: [Tags]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag deleted
+
+  /api/settings:
+    get:
+      summary: Get all settings
+      tags: [Settings]
+      responses:
+        '200':
+          description: User settings
+
+  /api/settings/{key}:
+    put:
+      summary: Set a setting
+      tags: [Settings]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Setting updated
+    delete:
+      summary: Delete a setting
+      tags: [Settings]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Setting deleted
+
+  /api/members:
+    get:
+      summary: List members
+      tags: [Members]
+      responses:
+        '200':
+          description: List of members
+
+  /api/members/invite:
+    post:
+      summary: Invite a member (admin only)
+      tags: [Members]
+      responses:
+        '201':
+          description: Member invited
+
+  /api/members/{id}:
+    get:
+      summary: Get member details
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member details
+    put:
+      summary: Update member
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member updated
+    delete:
+      summary: Delete member (admin only)
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member deleted
+
+  /api/members/{id}/deactivate:
+    put:
+      summary: Deactivate member (admin only)
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member deactivated
+
+  /api/members/{id}/activate:
+    put:
+      summary: Activate member (admin only)
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member activated
+
+  /api/members/{id}/unlock:
+    post:
+      summary: Unlock member (admin only)
+      tags: [Members]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Member unlocked
+
+  /api/shared/items:
+    get:
+      summary: List items shared with me
+      tags: [Sharing]
+      responses:
+        '200':
+          description: Shared items
+
+  /api/shared/categories:
+    get:
+      summary: List categories shared with me
+      tags: [Sharing]
+      responses:
+        '200':
+          description: Shared categories
+
+  /api/emergency/request:
+    post:
+      summary: Request emergency access
+      tags: [Emergency]
+      responses:
+        '201':
+          description: Request created
+
+  /api/emergency/requests:
+    get:
+      summary: List emergency access requests
+      tags: [Emergency]
+      responses:
+        '200':
+          description: List of requests
+
+  /api/emergency/{id}/approve:
+    put:
+      summary: Approve emergency access
+      tags: [Emergency]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Request approved
+
+  /api/emergency/{id}/reject:
+    put:
+      summary: Reject emergency access
+      tags: [Emergency]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Request rejected
+
+  /api/emergency/{id}:
+    delete:
+      summary: Cancel emergency access request
+      tags: [Emergency]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Request cancelled
+
+  /api/audit:
+    get:
+      summary: Get audit log
+      tags: [Audit]
+      responses:
+        '200':
+          description: Audit log entries
+    post:
+      summary: Log client-side error
+      tags: [Audit]
+      responses:
+        '201':
+          description: Error logged
+
+  /api/audit/export:
+    get:
+      summary: Export audit log (admin only)
+      tags: [Audit]
+      responses:
+        '200':
+          description: Audit log CSV
+
+  /api/generate-password:
+    post:
+      summary: Generate a random password
+      tags: [Security]
+      responses:
+        '200':
+          description: Generated password
+
+  /api/generate-passphrase:
+    post:
+      summary: Generate a random passphrase
+      tags: [Security]
+      responses:
+        '200':
+          description: Generated passphrase
+
+  /api/stats/dashboard:
+    get:
+      summary: Dashboard statistics
+      tags: [Stats]
+      responses:
+        '200':
+          description: Dashboard stats
+
+  /api/stats/activity:
+    get:
+      summary: Activity by day
+      tags: [Stats]
+      responses:
+        '200':
+          description: Activity data
+
+  /api/stats/encryption-health:
+    get:
+      summary: Encryption health
+      tags: [Stats]
+      responses:
+        '200':
+          description: Encryption health data
+
+  /api/stats/password-health:
+    get:
+      summary: Password health
+      tags: [Stats]
+      responses:
+        '200':
+          description: Password health data
+
+  /api/stats/security-score:
+    get:
+      summary: Security score
+      tags: [Stats]
+      responses:
+        '200':
+          description: Security score
+
+  /api/stats/health-report:
+    get:
+      summary: Health report
+      tags: [Stats]
+      responses:
+        '200':
+          description: Health report
+
+  /api/security/breach-check/{prefix}:
+    get:
+      summary: Check password breach (k-anonymity)
+      tags: [Security]
+      parameters:
+        - name: prefix
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Breach check result
+
+  /api/security/totp/verify:
+    post:
+      summary: Verify TOTP code
+      tags: [Security]
+      responses:
+        '200':
+          description: TOTP verification result
+
+  /api/security/totp/generate/{itemId}/{fieldId}:
+    get:
+      summary: Generate TOTP code
+      tags: [Security]
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: TOTP code
+
+  /api/security/reused-passwords:
+    get:
+      summary: Find reused passwords
+      tags: [Security]
+      responses:
+        '200':
+          description: Reused password groups
+
+  /api/data/import:
+    post:
+      summary: Import data
+      tags: [Data]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                format:
+                  type: string
+                  enum: [bitwarden, chrome, lastpass, onepassword, keepass]
+      responses:
+        '200':
+          description: Import result
+
+  /api/data/export:
+    get:
+      summary: Export vault data
+      tags: [Data]
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv, pdf]
+      responses:
+        '200':
+          description: Exported data
+
+  /api/data/backup:
+    post:
+      summary: Create a database backup
+      tags: [Data]
+      responses:
+        '200':
+          description: Backup created
+
+  /api/data/backups:
+    get:
+      summary: List backups
+      tags: [Data]
+      responses:
+        '200':
+          description: List of backups
+
+  /api/data/backups/verify:
+    get:
+      summary: Verify all backups (admin only)
+      tags: [Data]
+      responses:
+        '200':
+          description: Verification results
+
+  /api/data/migrate-encryption:
+    post:
+      summary: Migrate server encryption to client encryption
+      tags: [Data]
+      responses:
+        '200':
+          description: Items for migration

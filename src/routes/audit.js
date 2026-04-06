@@ -14,9 +14,33 @@ const auditQuerySchema = z.object({
   user_id: z.coerce.number().int().positive().optional(),
 });
 
+const clientErrorSchema = z.object({
+  action: z.enum(['client_error']),
+  detail: z.string().max(5000),
+});
+
 module.exports = function createAuditRoutes(db) {
   const router = Router();
   const repo = createAuditRepo(db);
+
+  // POST / — log client-side errors
+  router.post('/', validate({ body: clientErrorSchema }), (req, res, next) => {
+    try {
+      const { action, detail } = req.body;
+      const result = db.prepare(
+        'INSERT INTO audit_log (user_id, action, resource, resource_id, ip, ua, detail) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(
+        req.userId,
+        action,
+        'client',
+        null,
+        typeof req.ip === 'string' ? req.ip.slice(0, 45) : '',
+        typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'].slice(0, 256) : '',
+        detail
+      );
+      res.status(201).json({ id: Number(result.lastInsertRowid) });
+    } catch (err) { next(err); }
+  });
 
   // GET / — list audit log
   router.get('/', validate({ query: auditQuerySchema }), (req, res, next) => {

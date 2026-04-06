@@ -33,6 +33,11 @@
         <span class="material-icons-round">lock</span><span class="ni-label">Vault</span>
       </div>
     </div>
+    <div class="sb-section">
+      <div class="ni" data-view="shared" title="Shared">
+        <span class="material-icons-round">share</span><span class="ni-label">Shared</span>
+      </div>
+    </div>
     <div class="sb-section" id="sb-admin-section" style="display:none">
       <div class="sb-label">Admin</div>
       <div class="ni" data-view="members" title="Members">
@@ -81,7 +86,7 @@
   </div>
 
   <main class="content" id="ct" role="main">
-    <div id="view-container"></div>
+    <div id="view-container" aria-live="polite"></div>
   </main>
 </div>
 
@@ -157,6 +162,84 @@
   </div>
 </div>
 
+<!-- Share Modal -->
+<div class="modal-overlay" id="modal-share" role="dialog" aria-modal="true" aria-label="Share">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="share-modal-title">Share</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="form-group">
+      <label for="share-member-select">Member</label>
+      <select id="share-member-select" class="form-input"></select>
+    </div>
+    <div class="form-group">
+      <label for="share-permission-select">Permission</label>
+      <select id="share-permission-select" class="form-input">
+        <option value="read">Read</option>
+        <option value="write">Write</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary modal-share-cancel">Cancel</button>
+      <button class="btn btn-primary" id="share-submit-btn">Share</button>
+    </div>
+    <div style="margin-top:16px">
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Current Shares</h3>
+      <div id="share-current-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Emergency Request Modal -->
+<div class="modal-overlay" id="modal-emergency-request" role="dialog" aria-modal="true" aria-label="Emergency Access Request">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2 class="modal-title">Request Emergency Access</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <p id="emergency-request-info" style="margin-bottom:16px;color:var(--tx2)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="emergency-request-cancel">Cancel</button>
+      <button class="btn btn-primary" id="emergency-request-submit">Request Access</button>
+    </div>
+  </div>
+</div>
+
+<!-- Member Edit Modal -->
+<div class="modal-overlay" id="modal-member-edit" role="dialog" aria-modal="true" aria-label="Edit Member">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <h2 class="modal-title">Member Details</h2>
+      <button class="modal-close" aria-label="Close modal"><span class="material-icons-round">close</span></button>
+    </div>
+    <div class="form-group">
+      <label for="member-edit-name">Display Name</label>
+      <input type="text" id="member-edit-name" class="form-input">
+    </div>
+    <div class="form-group">
+      <label for="member-edit-role">Role</label>
+      <select id="member-edit-role" class="form-input">
+        <option value="admin">Admin</option>
+        <option value="adult">Adult</option>
+        <option value="child">Child</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <div id="member-edit-email" class="form-input" style="background:var(--bg-c);cursor:default"></div>
+    </div>
+    <div class="form-group">
+      <label>Joined</label>
+      <div id="member-edit-joined" class="form-input" style="background:var(--bg-c);cursor:default"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="member-edit-cancel">Cancel</button>
+      <button class="btn btn-primary" id="member-edit-save">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Help Overlay -->
 <div class="help-overlay" id="help-overlay">
   <div class="help-box">
@@ -187,6 +270,9 @@
 
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container" role="alert" aria-live="polite"></div>
+
+<!-- Screen Reader Announcements -->
+<div id="sr-announcements" aria-live="assertive" class="sr-only"></div>
 
 <script src="/store.js"></script>
 <script type="module" src="/js/utils.js"></script>

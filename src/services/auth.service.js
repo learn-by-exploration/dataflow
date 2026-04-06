@@ -200,12 +200,141 @@ function createAuthService(db, audit) {
       }
 
       const newAttempts = attempt.attempts + 1;
-      if (newAttempts >= 5) {
-        const lockedUntil = new Date(Date.now() + windowMs).toISOString();
+      let lockoutMs = 0;
+      if (newAttempts >= 15) {
+        lockoutMs = 60 * 60 * 1000; // 60 min
+      } else if (newAttempts >= 10) {
+        lockoutMs = 15 * 60 * 1000; // 15 min
+      } else if (newAttempts >= 5) {
+        lockoutMs = 5 * 60 * 1000; // 5 min
+      }
+
+      if (lockoutMs > 0) {
+        const lockedUntil = new Date(Date.now() + lockoutMs).toISOString();
         authRepo.incrementLoginAttempt(email, newAttempts, lockedUntil);
+        if (audit) {
+          audit.log({
+            userId: null,
+            action: 'account_lockout',
+            resource: 'user',
+            resourceId: null,
+            ip: '',
+            ua: '',
+            detail: JSON.stringify({ email, attempts: newAttempts, lockout_minutes: lockoutMs / 60000 }),
+          });
+        }
       } else {
         authRepo.incrementLoginAttempt(email, newAttempts);
       }
+    },
+
+    unlockAccount(email) {
+      authRepo.deleteLoginAttempt(email);
+    },
+
+    async rotateVaultKey(sid, { newMasterPassword }) {
+      const session = sessionRepo.findValidSession(sid);
+      if (!session) throw new UnauthorizedError();
+
+      const user = authRepo.findUserById(session.user_id);
+      if (!user) throw new UnauthorizedError();
+
+      // Get current vault key from session vault
+      const oldVaultKey = sessionVault.getVaultKey(sid);
+      if (!oldVaultKey) throw new UnauthorizedError('Vault locked. Please log in again.');
+
+      // Generate new vault key
+      const newVaultKey = generateVaultKey();
+
+      // Re-encrypt all server-encrypted items
+      const { encrypt: enc, decrypt: dec } = require('./encryption');
+      const createItemRepo = require('../repositories/item.repository');
+      const createFieldRepo = require('../repositories/item-field.repository');
+      const itemRepo = createItemRepo(db);
+      const fieldRepo = createFieldRepo(db);
+
+      const items = itemRepo.findAll(user.id, { limit: 100000, offset: 0 });
+
+      const txn = db.transaction(() => {
+        let rotated = 0;
+        for (const item of items) {
+          // Skip client-encrypted items
+          if (item.client_encrypted) continue;
+
+          const updateData = {};
+
+          if (item.title_encrypted) {
+            const title = dec(item.title_encrypted, item.title_iv, item.title_tag, oldVaultKey);
+            const titleEnc = enc(title, newVaultKey);
+            updateData.title_encrypted = titleEnc.ciphertext;
+            updateData.title_iv = titleEnc.iv;
+            updateData.title_tag = titleEnc.tag;
+          }
+
+          if (item.notes_encrypted) {
+            const notes = dec(item.notes_encrypted, item.notes_iv, item.notes_tag, oldVaultKey);
+            const notesEnc = enc(notes, newVaultKey);
+            updateData.notes_encrypted = notesEnc.ciphertext;
+            updateData.notes_iv = notesEnc.iv;
+            updateData.notes_tag = notesEnc.tag;
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            itemRepo.update(item.id, user.id, updateData);
+          }
+
+          // Re-encrypt fields
+          const fields = fieldRepo.findByItem(item.id);
+          for (const field of fields) {
+            if (field.value_encrypted) {
+              const val = dec(field.value_encrypted, field.value_iv, field.value_tag, oldVaultKey);
+              const valEnc = enc(val, newVaultKey);
+              fieldRepo.update(field.id, {
+                value_encrypted: valEnc.ciphertext,
+                value_iv: valEnc.iv,
+                value_tag: valEnc.tag,
+              });
+            }
+          }
+
+          rotated++;
+        }
+
+        // Derive new key and re-wrap vault key
+        const newSalt = crypto.randomBytes(32);
+        const newParams = {
+          memoryCost: config.isTest ? 1024 : config.argon2.memoryCost,
+          timeCost: config.isTest ? 1 : config.argon2.timeCost,
+          parallelism: config.argon2.parallelism,
+        };
+
+        return { rotated, newSalt, newParams };
+      });
+
+      const { rotated, newSalt, newParams } = txn();
+
+      // Async: derive new key and wrap (outside transaction because argon2 is async)
+      const newDerivedKey = await deriveKey(newMasterPassword, newSalt, newParams);
+      const newWrapped = wrapVaultKey(newVaultKey, newDerivedKey);
+      zeroBuffer(newDerivedKey);
+
+      authRepo.updateUserPassword(user.id, {
+        passwordHash: user.password_hash, // keep same login password
+        masterKeySalt: newSalt.toString('hex'),
+        masterKeyParams: JSON.stringify(newParams),
+        vaultKeyEncrypted: JSON.stringify(newWrapped),
+      });
+
+      // Store rotation date in settings
+      db.prepare(
+        `INSERT INTO settings (user_id, key, value) VALUES (?, 'last_vault_key_rotation', ?)
+         ON CONFLICT(user_id, key) DO UPDATE SET value = ?`
+      ).run(user.id, new Date().toISOString(), new Date().toISOString());
+
+      // Update session vault with new key
+      sessionVault.setVaultKey(sid, newVaultKey, user.id);
+
+      return { ok: true, items_rotated: rotated };
     },
   };
 }

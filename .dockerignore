@@ -1,0 +1,10 @@
+node_modules/
+tests/
+docs/
+coverage/
+.git/
+*.md
+.github/
+.env*
+data/
+backups/

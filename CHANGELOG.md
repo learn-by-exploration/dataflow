@@ -5,6 +5,116 @@ All notable changes to DataFlow will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-04-06
+
+### Added — Batch 2: Security Hardening
+- Session management API (view/revoke active sessions)
+- Progressive account lockout (5→5min, 10→15min, 15+→1hr)
+- Admin account unlock endpoint
+- Permissions-Policy, COOP headers
+- Per-route rate limiting (auth: 10/min, write: 30/min, read: 100/min)
+- Input sanitization (null byte rejection, NFC normalization)
+- Audit log retention with configurable days (default 90)
+- CSP violation reporting endpoint
+- Password change UI with strength indicator
+
+### Added — Batch 3: Client-Side Encryption
+- Client-side AES-256-GCM crypto module (public/js/crypto.js)
+- WebCrypto key derivation (PBKDF2, 600K iterations)
+- Key wrapping for vault key storage
+- Encryption mode (server/client) per user
+- Vault key rotation (re-encrypt all items)
+- Encryption health check endpoint
+- Data migration pathway (server→client encryption)
+
+### Added — Batch 4: Missing Critical UIs
+- Share item/category UI with member picker and permission select
+- Manage shares view (shared by me / shared with me tabs)
+- Emergency access request, management, and configuration UIs
+- Attachment upload with drag-and-drop in item editor
+- Attachment preview/download with type icons
+- Category editor UI (create, edit, delete, color picker)
+- Member profile edit modal
+
+### Added — Batch 5: Vault Intelligence
+- HIBP breach check with k-anonymity (5-char hash prefix)
+- Password health dashboard (weak, reused, old, breached counts)
+- Password strength scoring (zxcvbn-like, 0-4 scale)
+- TOTP code generator (RFC 6238, 6-digit, 30s period)
+- Security score calculator (0-100 composite metric)
+- Vault health report with recommendations
+- Breach monitoring alerts on vault unlock
+- Password age tracking per field
+- Reused password detection
+- Recovery codes (10 one-time alphanumeric codes)
+
+### Added — Batch 6: UX Completeness
+- Trash / soft delete with 30-day recovery
+- Restore from trash UI with countdown
+- Empty trash with confirmation
+- Favorites toggle (star icon, sort first)
+- Theme persistence to backend
+- Item version history with timeline
+- Duplicate detection on item save
+- Copy/duplicate items with new encryption IVs
+- Bulk tag management (add/remove across selected items)
+- Onboarding tour for first-time users
+
+### Added — Batch 7: Search & Data
+- FTS5 full-text search index
+- Fuzzy search with Levenshtein distance
+- Advanced filter UI (category, tags, date range, strength, favorites, attachments)
+- Search result highlighting with XSS-safe markup
+- Export wizard (JSON/CSV/PDF, scope selection, preview)
+- Import wizard (file upload, auto-detect, preview, category mapping)
+- CSV export with proper escaping
+- PDF export via print-friendly HTML
+- Print view with @media print stylesheet
+- Bulk export selected items
+
+### Added — Batch 8: Polish & Accessibility
+- Loading state skeletons with pulse animation
+- Error boundaries with recovery UI
+- WCAG 2.1 AA color contrast compliance
+- ARIA labels, roles, and landmarks
+- Screen reader announcements (aria-live region)
+- Keyboard navigation with visible focus indicators
+- Skip to content link
+- Focus trap for all modals (Tab cycling, Escape close)
+- Mobile responsive polish (hamburger menu, touch targets)
+- Offline indicator with mutation queue
+- Stackable toast notifications with action buttons
+
+### Added — Batch 9: Infrastructure
+- GitHub Actions CI workflow (ci.yml)
+- Database indexes (compound, partial for common queries)
+- DB maintenance scheduler (daily optimize, weekly checkpoint, startup integrity)
+- Backup integrity verification with SHA-256 checksums
+- Prometheus metrics endpoint (/api/metrics)
+- OpenAPI 3.0.3 spec (docs/openapi.yaml) with validation tests
+- File-based log rotation (daily, max 7 files)
+- Docker multi-stage build optimization (node:22-alpine)
+- Enhanced health check (basic + detailed with DB stats)
+- E2E integration test flows (full user journeys)
+
+### Added — Batch 10: Power Features
+- Bulk edit items (change category, record type)
+- Bulk move items to category
+- Bulk delete items (soft delete)
+- Expiring shares (1h, 1d, 7d, 30d, custom)
+- Secure share links (token, passphrase, one-time use, expiry)
+- Vault analytics dashboard (CSS charts, trends, top tags)
+- Enhanced field types (date picker, phone, URL, email, select)
+- User-defined templates (save as / create from)
+- Merge duplicates wizard (side-by-side, per-field selection)
+- Family activity feed (filterable, auto-refresh)
+
+### Changed
+- Test suite: 838 → 1,287 tests across 60 test files
+- LOC: ~7,600 → ~13,000
+- DB tables: 17 → 21 (+ item_history, item_templates, recovery_codes, share_links)
+- DB migrations: 2 → 13
+
 ## [0.2.0] — 2026-04-06
 
 ### Changed

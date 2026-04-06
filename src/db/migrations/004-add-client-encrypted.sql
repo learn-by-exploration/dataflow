@@ -1,0 +1,1 @@
+ALTER TABLE items ADD COLUMN client_encrypted INTEGER NOT NULL DEFAULT 0;

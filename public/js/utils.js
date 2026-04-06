@@ -85,17 +85,54 @@ export async function copyToClipboard(text) {
  * Toast notification
  */
 export function toast(message, type = 'info') {
+  showToast(message, type);
+}
+
+/**
+ * Enhanced toast with options — stackable, auto-dismiss, action buttons
+ */
+export function showToast(message, type = 'info', options = {}) {
   const container = document.getElementById('toast-container');
   if (!container) return;
+
+  // Limit stacking to max 3
+  const existing = container.querySelectorAll('.toast');
+  if (existing.length >= 3) existing[0].remove();
+
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;
   el.setAttribute('role', 'alert');
+  el.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
   el.textContent = message;
+
+  // Dismiss button
+  const dismiss = document.createElement('button');
+  dismiss.className = 'toast-dismiss';
+  dismiss.setAttribute('aria-label', 'Dismiss');
+  dismiss.textContent = '\u00d7';
+  dismiss.addEventListener('click', () => removeToast(el));
+  el.appendChild(dismiss);
+
+  // Optional action button
+  if (options.action && options.actionLabel) {
+    const actionBtn = document.createElement('button');
+    actionBtn.className = 'toast-action';
+    actionBtn.textContent = options.actionLabel;
+    actionBtn.addEventListener('click', () => { options.action(); removeToast(el); });
+    el.appendChild(actionBtn);
+  }
+
   container.appendChild(el);
-  setTimeout(() => {
-    el.classList.add('toast-fade');
-    setTimeout(() => el.remove(), 300);
-  }, 3000);
+
+  const duration = options.duration || (type === 'error' ? 10000 : 5000);
+  const timer = setTimeout(() => removeToast(el), duration);
+  el._toastTimer = timer;
+
+  function removeToast(t) {
+    clearTimeout(t._toastTimer);
+    t.classList.add('toast-fade');
+    setTimeout(() => t.remove(), 300);
+  }
 }
 
 /**

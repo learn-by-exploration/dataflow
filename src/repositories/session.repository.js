@@ -21,6 +21,20 @@ function createSessionRepo(db) {
     deleteUserSessions(userId) {
       db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
     },
+
+    findByUserId(userId) {
+      return db.prepare(
+        "SELECT sid, user_id, expires_at, created_at FROM sessions WHERE user_id = ? AND expires_at > datetime('now') ORDER BY created_at DESC"
+      ).all(userId);
+    },
+
+    deleteSessionBySid(sid, userId) {
+      return db.prepare('DELETE FROM sessions WHERE sid = ? AND user_id = ?').run(sid, userId);
+    },
+
+    deleteOtherSessions(currentSid, userId) {
+      return db.prepare('DELETE FROM sessions WHERE user_id = ? AND sid != ?').run(userId, currentSid);
+    },
   };
 }
 

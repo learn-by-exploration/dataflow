@@ -36,8 +36,14 @@ const config = Object.freeze({
     retainCount: parseInt(process.env.BACKUP_RETAIN_COUNT, 10) || 7,
     intervalHours: parseInt(process.env.BACKUP_INTERVAL_HOURS, 10) || 24,
   },
+  auditRetentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS, 10) || 90,
   log: {
     level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'test' ? 'silent' : 'info'),
+    dir: process.env.LOG_DIR || 'logs',
+    maxFiles: parseInt(process.env.LOG_MAX_FILES, 10) || 7,
+  },
+  dbMaintenance: {
+    enabled: process.env.DB_MAINTENANCE_ENABLED !== 'false',
   },
   shutdownTimeoutMs: parseInt(process.env.SHUTDOWN_TIMEOUT_MS, 10) || 10000,
   trustProxy: process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true',

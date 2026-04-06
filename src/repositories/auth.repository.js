@@ -64,6 +64,28 @@ function createAuthRepo(db) {
     deleteLoginAttempt(email) {
       db.prepare('DELETE FROM login_attempts WHERE email = ?').run(email);
     },
+
+    updateKeyPair(userId, { publicKey, encryptedPrivateKey }) {
+      db.prepare(
+        'UPDATE users SET public_key = ?, encrypted_private_key = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      ).run(publicKey, encryptedPrivateKey, userId);
+    },
+
+    getKeyPair(userId) {
+      const row = db.prepare('SELECT public_key, encrypted_private_key FROM users WHERE id = ?').get(userId);
+      return row || null;
+    },
+
+    updateEncryptionMode(userId, mode) {
+      db.prepare(
+        'UPDATE users SET encryption_mode = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      ).run(mode, userId);
+    },
+
+    getEncryptionMode(userId) {
+      const row = db.prepare('SELECT encryption_mode FROM users WHERE id = ?').get(userId);
+      return row ? row.encryption_mode : 'server';
+    },
   };
 }
 

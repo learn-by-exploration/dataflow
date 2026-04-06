@@ -39,6 +39,9 @@ function initDatabase(dbDir) {
       master_key_salt TEXT,
       master_key_params TEXT,
       vault_key_encrypted TEXT,
+      encryption_mode TEXT NOT NULL DEFAULT 'server' CHECK(encryption_mode IN ('server','client')),
+      public_key TEXT,
+      encrypted_private_key TEXT,
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -114,8 +117,10 @@ function initDatabase(dbDir) {
       notes_iv TEXT,
       notes_tag TEXT,
       favorite INTEGER NOT NULL DEFAULT 0,
+      client_encrypted INTEGER NOT NULL DEFAULT 0,
       position INTEGER DEFAULT 0,
       title_sort_key TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -127,6 +132,8 @@ function initDatabase(dbDir) {
       value_encrypted TEXT,
       value_iv TEXT,
       value_tag TEXT,
+      strength_score INTEGER,
+      password_last_changed TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -165,6 +172,7 @@ function initDatabase(dbDir) {
       shared_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       shared_with INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       permission TEXT NOT NULL DEFAULT 'read' CHECK(permission IN ('read','write')),
+      expires_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -174,6 +182,7 @@ function initDatabase(dbDir) {
       shared_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       shared_with INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       permission TEXT NOT NULL DEFAULT 'read' CHECK(permission IN ('read','write')),
+      expires_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
@@ -207,7 +216,49 @@ function initDatabase(dbDir) {
       name TEXT PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS recovery_codes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS item_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      field_name TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      changed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS share_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      passphrase_hash TEXT,
+      expires_at TEXT,
+      one_time INTEGER NOT NULL DEFAULT 0,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS item_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      record_type_id INTEGER REFERENCES record_types(id) ON DELETE SET NULL,
+      default_fields TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+
+  // ─── FTS5 search index ───
+  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(item_id UNINDEXED, title, notes)`);
 
   // ─── Indexes ───
   db.exec(`
@@ -221,10 +272,23 @@ function initDatabase(dbDir) {
     CREATE INDEX IF NOT EXISTS idx_tags_user ON tags(user_id);
     CREATE INDEX IF NOT EXISTS idx_item_shares_item ON item_shares(item_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_item_shares_unique ON item_shares(item_id, shared_with);
+    CREATE INDEX IF NOT EXISTS idx_item_shares_shared_with ON item_shares(shared_with);
     CREATE INDEX IF NOT EXISTS idx_category_shares_category ON category_shares(category_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_category_shares_unique ON category_shares(category_id, shared_with);
     CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_log_user_date ON audit_log(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_recovery_codes_user ON recovery_codes(user_id);
+    CREATE INDEX IF NOT EXISTS idx_item_history_item ON item_history(item_id);
+    CREATE INDEX IF NOT EXISTS idx_item_history_changed_at ON item_history(changed_at);
+    CREATE INDEX IF NOT EXISTS idx_items_user_category ON items(user_id, category_id);
+    CREATE INDEX IF NOT EXISTS idx_item_tags_item ON item_tags(item_id);
+    CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON item_tags(tag_id);
+    CREATE INDEX IF NOT EXISTS idx_items_deleted ON items(deleted_at) WHERE deleted_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_share_links_token ON share_links(token);
+    CREATE INDEX IF NOT EXISTS idx_share_links_item ON share_links(item_id);
+    CREATE INDEX IF NOT EXISTS idx_item_templates_user ON item_templates(user_id);
   `);
 
   // Run migrations (for existing databases that need schema updates)

@@ -2,18 +2,18 @@
 
 function createSharingRepo(db) {
   return {
-    shareItem(itemId, sharedBy, sharedWith, permission) {
+    shareItem(itemId, sharedBy, sharedWith, permission, expiresAt) {
       const existing = db.prepare(
         'SELECT id FROM item_shares WHERE item_id = ? AND shared_with = ?'
       ).get(itemId, sharedWith);
       if (existing) {
-        db.prepare('UPDATE item_shares SET permission = ? WHERE id = ?')
-          .run(permission, existing.id);
+        db.prepare('UPDATE item_shares SET permission = ?, expires_at = ? WHERE id = ?')
+          .run(permission, expiresAt || null, existing.id);
         return db.prepare('SELECT * FROM item_shares WHERE id = ?').get(existing.id);
       }
       const result = db.prepare(
-        'INSERT INTO item_shares (item_id, shared_by, shared_with, permission) VALUES (?, ?, ?, ?)'
-      ).run(itemId, sharedBy, sharedWith, permission);
+        'INSERT INTO item_shares (item_id, shared_by, shared_with, permission, expires_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(itemId, sharedBy, sharedWith, permission, expiresAt || null);
       return db.prepare('SELECT * FROM item_shares WHERE id = ?').get(result.lastInsertRowid);
     },
 
@@ -37,18 +37,18 @@ function createSharingRepo(db) {
       ).get(itemId, userId) || null;
     },
 
-    shareCategory(catId, sharedBy, sharedWith, permission) {
+    shareCategory(catId, sharedBy, sharedWith, permission, expiresAt) {
       const existing = db.prepare(
         'SELECT id FROM category_shares WHERE category_id = ? AND shared_with = ?'
       ).get(catId, sharedWith);
       if (existing) {
-        db.prepare('UPDATE category_shares SET permission = ? WHERE id = ?')
-          .run(permission, existing.id);
+        db.prepare('UPDATE category_shares SET permission = ?, expires_at = ? WHERE id = ?')
+          .run(permission, expiresAt || null, existing.id);
         return db.prepare('SELECT * FROM category_shares WHERE id = ?').get(existing.id);
       }
       const result = db.prepare(
-        'INSERT INTO category_shares (category_id, shared_by, shared_with, permission) VALUES (?, ?, ?, ?)'
-      ).run(catId, sharedBy, sharedWith, permission);
+        'INSERT INTO category_shares (category_id, shared_by, shared_with, permission, expires_at) VALUES (?, ?, ?, ?, ?)'
+      ).run(catId, sharedBy, sharedWith, permission, expiresAt || null);
       return db.prepare('SELECT * FROM category_shares WHERE id = ?').get(result.lastInsertRowid);
     },
 
@@ -90,6 +90,12 @@ function createSharingRepo(db) {
          JOIN users u ON s.shared_by = u.id
          WHERE s.shared_with = ?`
       ).all(userId);
+    },
+
+    cleanExpiredShares() {
+      const items = db.prepare("DELETE FROM item_shares WHERE expires_at IS NOT NULL AND expires_at < datetime('now')").run();
+      const cats = db.prepare("DELETE FROM category_shares WHERE expires_at IS NOT NULL AND expires_at < datetime('now')").run();
+      return items.changes + cats.changes;
     },
   };
 }

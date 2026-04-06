@@ -1,7 +1,7 @@
 # DataFlow — Claude Code Configuration
 
-> **Last updated:** 6 April 2026 · **Version:** 0.2.0
-> **Metrics:** 838 tests | 49 test files | 17 DB tables | ~7600 LOC
+> **Last updated:** 6 April 2026 · **Version:** 0.3.0
+> **Metrics:** 1287 tests | 60 test files | 21 DB tables | ~13000 LOC
 
 ## Project Overview
 
@@ -37,6 +37,10 @@ docker compose up --build -d
 | `ARGON2_MEMORY` | `65536` | Argon2id memory cost in KiB (64 MiB) |
 | `ARGON2_TIME` | `3` | Argon2id time cost (iterations) |
 | `ARGON2_PARALLELISM` | `1` | Argon2id parallelism |
+| `AUDIT_RETENTION_DAYS` | `90` | Auto-delete audit logs older than N days |
+| `LOG_DIR` | `logs/` | Log file directory |
+| `LOG_MAX_FILES` | `7` | Max log files to retain |
+| `DB_MAINTENANCE_ENABLED` | `true` | Enable DB maintenance (VACUUM, ANALYZE) |
 
 See `.env.example` for all variables.
 
@@ -57,20 +61,23 @@ src/
     seed.js           — Built-in record types (14 templates)
     migrations/       — Versioned SQL migration files
   routes/
-    auth.js           — Register, login, logout, session, change password
+    auth.js           — Register, login, logout, session, change password, recovery codes
     categories.js     — Category CRUD, reorder
     record-types.js   — Record type CRUD, field management
-    items.js          — Item CRUD, bulk ops, search, filtering
+    items.js          — Item CRUD, bulk ops, search, filtering, trash, favorites, history, merge
     attachments.js    — File upload/download/delete (encrypted)
     tags.js           — Tag CRUD, usage
-    members.js        — Member invitation, roles, profile, deactivation
-    sharing.js        — Item/category sharing, permissions, revocation
+    members.js        — Member invitation, roles, profile, deactivation, unlock
+    sharing.js        — Item/category sharing, permissions, revocation, expiry
+    share-links.js    — Secure share links (token-based, passphrase, one-time)
     emergency.js      — Emergency access request/approve/reject
     audit.js          — Audit log listing, filters
-    stats.js          — Dashboard, security health
-    data.js           — Export, import, backup
+    stats.js          — Dashboard, security health, analytics, activity feed, metrics
+    security.js       — HIBP breach check, TOTP, reused passwords
+    templates.js      — User-defined item templates
+    data.js           — Export (JSON/CSV/PDF), import, backup, verification
     settings.js       — User preferences
-    health.js         — Health check endpoint
+    health.js         — Health check endpoint (basic + detailed)
   middleware/
     auth.js           — Session-based authentication guard
     rbac.js           — Role-based access control (admin/adult/child/guest)
@@ -103,13 +110,23 @@ src/
     encryption.js     — AES-256-GCM encrypt/decrypt, Argon2id key derivation, key wrapping
     session-vault.js  — In-memory vault key store per session, auto-lock
     audit.js          — Audit logging for all mutations
-    backup.js         — Auto-backup, restore, data watermark
+    backup.js         — Auto-backup, restore, data watermark, integrity verification
     category.service.js
     record-type.service.js
-    item.service.js   — Encrypt/decrypt fields orchestration
+    item.service.js   — Encrypt/decrypt fields, soft-delete, copy, merge, duplicate detection
     attachment.service.js — File encryption/decryption
     search.js         — In-memory encrypted search index
+    search.service.js — FTS5 search, fuzzy search (Levenshtein), highlighting
+    export.service.js — CSV/JSON export with filtering
     password-generator.js — Random password + passphrase generation
+    password-strength.js — zxcvbn-like scoring (0-4)
+    breach.service.js — HIBP API proxy with k-anonymity + caching
+    totp.service.js   — RFC 6238 TOTP generation, otpauth:// parsing
+    security.service.js — Security score, reused password detection, vault health
+    recovery.service.js — Recovery codes lifecycle (generate/use/status)
+    history.service.js — Item version history tracking
+    template.service.js — User-defined templates
+    share-link.service.js — Secure share links with tokens
     emergency.service.js
     importers/
       bitwarden.js    — Bitwarden JSON import
@@ -166,9 +183,10 @@ record_type_fields (id, record_type_id→record_types, name, field_type[text|pas
 items              (id, user_id→users, category_id→categories, record_type_id→record_types,
                     title_encrypted, title_iv, title_tag,
                     notes_encrypted, notes_iv, notes_tag,
-                    favorite, position, created_at, updated_at)
+                    favorite, position, deleted_at, created_at, updated_at)
 item_fields        (id, item_id→items, field_def_id→record_type_fields,
-                    value_encrypted, value_iv, value_tag, created_at)
+                    value_encrypted, value_iv, value_tag,
+                    strength_score, password_last_changed, created_at)
 item_attachments   (id, item_id→items, user_id→users, filename, original_name,
                     mime_type, size_bytes, encryption_iv, encryption_tag, created_at)
 tags               (id, user_id→users, name, color)
@@ -178,9 +196,19 @@ item_tags          (item_id→items, tag_id→tags)
 ### Sharing
 ```
 item_shares        (id, item_id→items, shared_by→users, shared_with→users,
-                    permission[read|write], created_at)
+                    permission[read|write], expires_at, created_at)
 category_shares    (id, category_id→categories, shared_by→users, shared_with→users,
-                    permission[read|write], created_at)
+                    permission[read|write], expires_at, created_at)
+share_links        (id, item_id→items, user_id→users, token, passphrase_hash,
+                    expires_at, one_time, used_at, created_at)
+```
+
+### History & Templates
+```
+item_history       (id, item_id→items, field_name, old_value, new_value,
+                    changed_by→users, changed_at)
+item_templates     (id, user_id→users, name, record_type_id, default_fields JSON, created_at)
+recovery_codes     (id, user_id→users, code_hash, used_at, created_at)
 ```
 
 ### Emergency & Audit
@@ -198,36 +226,43 @@ All foreign keys use `ON DELETE CASCADE` except: `audit_log.user_id` (SET NULL �
 
 | Module | Prefix | Routes | Covers |
 |--------|--------|--------|--------|
-| `auth.js` | `/api/auth` | ~8 | Register, login, logout, session, change password |
+| `auth.js` | `/api/auth` | ~12 | Register, login, logout, session, change password, recovery codes, key rotation |
 | `categories.js` | `/api/categories` | ~8 | Category CRUD, reorder |
 | `record-types.js` | `/api/record-types` | ~10 | Record type CRUD, field management, built-in listing |
-| `items.js` | `/api/items` | ~15 | Item CRUD, search, filter, bulk ops |
+| `items.js` | `/api/items` | ~22 | Item CRUD, search, filter, bulk ops, trash, favorites, history, copy, merge |
 | `attachments.js` | `/api/attachments` | ~5 | Upload, download, delete (encrypted) |
 | `tags.js` | `/api/tags` | ~6 | Tag CRUD, usage stats |
-| `members.js` | `/api/members` | ~8 | Invite, roles, profile, deactivate |
-| `sharing.js` | `/api/sharing` | ~8 | Share/unshare items & categories, list shared |
+| `members.js` | `/api/members` | ~9 | Invite, roles, profile, deactivate, unlock |
+| `sharing.js` | `/api/sharing` | ~8 | Share/unshare items & categories, list shared, expiry |
+| `share-links.js` | `/api/share-links` | ~3 | Create, resolve secure share links |
 | `emergency.js` | `/api/emergency` | ~5 | Request, approve, reject, status |
 | `audit.js` | `/api/audit` | ~3 | List, filter, export |
-| `stats.js` | `/api/stats` | ~4 | Dashboard, security health |
-| `data.js` | `/api/data` | ~8 | Export, import (5 formats), backup |
+| `security.js` | `/api/security` | ~4 | HIBP breach check, TOTP verify/generate, reused passwords |
+| `stats.js` | `/api/stats` | ~8 | Dashboard, security health, score, analytics, activity feed, metrics |
+| `templates.js` | `/api/templates` | ~4 | Template CRUD |
+| `data.js` | `/api/data` | ~10 | Export (JSON/CSV/PDF), import (5 formats), backup, verify |
 | `settings.js` | `/api/settings` | ~3 | User preferences |
-| `health.js` | `/api/health` | 1 | Health check |
+| `health.js` | `/api/health` | 1 | Health check (basic + detailed) |
 
 ## Frontend Views
 
 | Key | View | Description |
 |-----|------|-------------|
-| `1` | Dashboard | Vault summary cards, recent activity, quick actions |
-| `2` | Vault | All items grid/list, category sidebar, search, filters |
+| `1` | Dashboard | Vault summary, security score, password health, breach alerts |
+| `2` | Vault | All items grid/list, category sidebar, search, advanced filters |
 | — | Category | Items within a category, record type badges |
-| — | Item Detail | Field list (masked passwords), copy buttons, attachments |
-| — | Item Editor | Dynamic form from record type fields, save/cancel |
-| `3` | Members | Member list, invite, role badges, deactivate |
+| — | Item Detail | Fields (masked passwords), copy, attachments, history, TOTP |
+| — | Item Editor | Dynamic form, attachments upload, drag-and-drop |
+| `3` | Members | Member list, invite, role badges, emergency access, unlock |
 | `4` | Audit Log | Sortable table, filters (user, action, date) |
-| — | Settings | Tabs: General, Appearance, Security, Data |
+| — | Shared | Shared by me / Shared with me tabs |
+| — | Trash | Soft-deleted items, restore, empty trash |
+| — | Analytics | Category charts, item trends, activity stats, top tags |
+| — | Activity | Family activity feed, member filter, auto-refresh |
+| — | Settings | Tabs: General, Appearance, Security, Data, Templates |
 | — | Record Types | Type manager, field editor, create custom |
 | — | Password Gen | Length slider, char sets, passphrase, entropy display |
-| — | Onboarding | First-run: create admin, master password, initial categories |
+| — | Onboarding | First-run tour: create category → add item → explore |
 | — | Lock Screen | Auto-lock overlay, re-enter master password |
 | — | Login | Auth login page |
 | — | Landing | Marketing landing page |
@@ -251,6 +286,9 @@ All foreign keys use `ON DELETE CASCADE` except: `audit_log.user_id` (SET NULL �
 - Argon2id key derivation (64 MiB, 3 iterations)
 - Vault key wrapping (encrypted master key per user)
 - File attachment encryption (AES-256-GCM)
+- Client-side encryption module (WebCrypto, PBKDF2)
+- Key rotation (re-encrypt all items with new vault key)
+- Encryption health check (server vs client mode)
 - Memory safety (buffer zeroing)
 - Auto-lock (configurable timeout, clears vault key from memory)
 
@@ -258,6 +296,8 @@ All foreign keys use `ON DELETE CASCADE` except: `audit_log.user_id` (SET NULL �
 - Per-item sharing with specific members
 - Per-category sharing
 - Read-only vs read-write permissions
+- Expiring shares (1h, 1d, 7d, 30d, custom)
+- Secure share links (token-based, optional passphrase, one-time use)
 - "Share with all adults" convenience
 - Admin can view all items (emergency override)
 - Emergency access with configurable wait period (1–30 days)
@@ -267,24 +307,63 @@ All foreign keys use `ON DELETE CASCADE` except: `audit_log.user_id` (SET NULL �
 - No plaintext sensitive data in database
 - Clipboard auto-clear (30 seconds)
 - Password generator (random + passphrase + entropy)
-- Password strength indicator (zxcvbn)
-- Helmet CSP, HSTS, X-Frame-Options
+- Password strength indicator (zxcvbn-like scoring 0-4)
+- HIBP breach check (k-anonymity, 5-char hash prefix)
+- Breach monitoring alerts on vault unlock
+- Password health dashboard (weak, reused, old, breached)
+- Security score (0-100, composite metric)
+- TOTP code generator (RFC 6238)
+- Recovery codes (10 one-time codes)
+- Reused password detection
+- Password age tracking
+- Progressive account lockout
+- Session management (view, revoke, revoke all)
+- Helmet CSP, HSTS, X-Frame-Options, Permissions-Policy, COOP
+- Per-route rate limiting
 - Constant-time comparison for auth
 
 ### Data
 - Import: Bitwarden JSON, 1Password CSV, KeePass XML, LastPass CSV, Chrome CSV
-- Export: Encrypted JSON backup, CSV (with warning)
-- Auto-backup (startup + 24h, rotate last 7)
+- Export: JSON, CSV, PDF (print-friendly)
+- Import/export wizard UI with preview
+- FTS5 full-text search with fuzzy matching
+- Advanced filtering (category, tags, date, strength, favorites, attachments)
+- Search highlighting
+- Auto-backup with SHA-256 integrity verification
 - Data watermark (detect >50% loss, auto-restore)
 
 ### UX
+- Trash / soft delete (30-day recovery)
+- Favorites with sort priority
+- Item version history with timeline
+- Duplicate detection on save
+- Copy/duplicate items
+- Bulk operations (edit, move, delete, tag)
+- User-defined templates (save as / create from)
+- Merge duplicates wizard
+- Onboarding tour for first-time users
+- Theme persistence (dark/light/auto)
+- Vault analytics dashboard (charts, trends)
+- Family activity feed (filterable, auto-refresh)
+- Loading skeletons and error boundaries
+- WCAG 2.1 AA accessibility (ARIA, focus trap, keyboard nav, screen reader)
 - Responsive mobile layout (touch targets ≥ 44px)
+- Offline indicator with mutation queue
+- Stackable toast notifications with undo actions
 - One-click copy for all fields
 - Password visibility toggle
-- Toast notifications
-- Keyboard navigation
-- Onboarding wizard
-- Drag-and-drop reorder (categories, items)
+- Keyboard shortcuts: `N` new, `/` search, `?` help, `Esc` close, `L` lock
+
+### Infrastructure
+- GitHub Actions CI (lint, test, security audit)
+- Database indexes (compound, partial)
+- DB maintenance scheduler (optimize, checkpoint, integrity)
+- Prometheus metrics endpoint
+- OpenAPI spec with validation tests
+- File-based log rotation
+- Docker multi-stage build (node:22-alpine)
+- Enhanced health check (basic + detailed)
+- E2E integration test flows
 
 ## Key Patterns
 
@@ -315,10 +394,19 @@ npm run test:fast           # Skip performance tests
 | CRUD | categories, record-types, items, tags, attachments | Entity lifecycle, validation |
 | Family | members, rbac, sharing, emergency | Roles, permissions, sharing |
 | Security | security, sql-safety, xss, idor, session-security, encryption-audit | OWASP coverage |
+| Batch 2 | batch2-security | Session management, lockout, headers, rate limits |
+| Batch 3 | batch3-encryption, client-crypto | Client-side crypto, key rotation, migration |
+| Batch 4 | batch4-ui | Share UI, emergency UI, attachments UI, category editor |
+| Batch 5 | batch5-intelligence | HIBP, TOTP, password health, recovery codes |
+| Batch 6 | batch6-ux | Soft delete, favorites, history, duplicates, templates |
+| Batch 7 | batch7-search | FTS5, fuzzy, filters, CSV export, search highlighting |
+| Batch 8 | batch8-polish | ARIA, a11y, toasts, focus trap, offline, error boundaries |
+| Batch 9 | batch9-infra, openapi, e2e-flows | Indexes, metrics, health, CI, backup verification |
+| Batch 10 | batch10-power | Bulk ops, share links, analytics, templates, merge, activity |
 | Import/Export | import-*, data, backup | Import formats, export, backup |
 | Integration | multi-user, concurrency, performance | Cross-cutting |
 | Frontend | frontend-validation, a11y, mobile-responsive | UI validation |
-| E2E | e2e-smoke, release-hygiene | Smoke tests, version checks |
+| E2E | e2e-smoke, e2e-flows, release-hygiene | Smoke tests, user journeys, version checks |
 
 **Isolation:** Each test file uses temp DB via `DB_DIR` env var, `cleanDb()` in `beforeEach`, factories: `makeCategory()`, `makeRecordType()`, `makeItem()`, `makeTag()`, `makeMember()`, `shareItem()`, `getVaultKey()`.
 
@@ -345,7 +433,7 @@ npm run test:fast           # Skip performance tests
 | Version bump | CLAUDE.md header, `package.json`, `docs/openapi.yaml` |
 
 **Update the CLAUDE.md header line counts** when LOC changes significantly (>5%):
-- **Current:** 0 tests | 0 test files | 0 routes | 0 tables | ~0 LOC
+- **Current:** 1287 tests | 60 test files | 21 tables | ~13000 LOC
 
 ## Roadmap
 

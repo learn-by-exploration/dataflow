@@ -1,5 +1,7 @@
 # DataFlow
 
+[![CI](https://github.com/learn-by-exploration/dataflow/actions/workflows/ci.yml/badge.svg)](https://github.com/learn-by-exploration/dataflow/actions/workflows/ci.yml)
+
 Secure, self-hosted family data vault — an encrypted web application for managing passwords, documents, and sensitive family data.
 
 ## Features

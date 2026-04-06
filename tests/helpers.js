@@ -34,6 +34,9 @@ function cleanDb() {
   db.exec('DELETE FROM item_attachments');
   db.exec('DELETE FROM item_shares');
   db.exec('DELETE FROM category_shares');
+  try { db.exec('DELETE FROM item_history'); } catch { /* table may not exist yet */ }
+  try { db.exec('DELETE FROM share_links'); } catch { /* table may not exist yet */ }
+  try { db.exec('DELETE FROM item_templates'); } catch { /* table may not exist yet */ }
   db.exec('DELETE FROM items');
   db.exec('DELETE FROM tags');
   db.exec('DELETE FROM categories');
@@ -41,6 +44,7 @@ function cleanDb() {
   db.exec('DELETE FROM audit_log');
   db.exec('DELETE FROM settings');
   db.exec('DELETE FROM login_attempts');
+  db.exec('DELETE FROM recovery_codes');
   db.exec('DELETE FROM sessions');
   db.exec('DELETE FROM users');
   // Clear in-memory session vault to prevent stale vault keys across tests

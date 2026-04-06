@@ -21,7 +21,15 @@ function createAuditLogger(db) {
     }
   }
 
-  return { log };
+  function cleanOldAuditLogs(retentionDays) {
+    if (!retentionDays || retentionDays <= 0) return { deleted: 0 };
+    const result = db.prepare(
+      "DELETE FROM audit_log WHERE created_at < datetime('now', '-' || ? || ' days')"
+    ).run(String(retentionDays));
+    return { deleted: result.changes };
+  }
+
+  return { log, cleanOldAuditLogs };
 }
 
 module.exports = createAuditLogger;

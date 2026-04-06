@@ -1,11 +1,11 @@
 # ─── Stage 1: Install dependencies ───
-FROM node:22-slim AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ─── Stage 2: Production image ───
-FROM node:22-slim
+FROM node:22-alpine
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
@@ -16,6 +16,6 @@ ENV DB_DIR=/app/data NODE_ENV=production PORT=3460
 USER node
 EXPOSE 3460
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const p=process.env.PORT||3460;require('http').get('http://127.0.0.1:'+p+'/api/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+  CMD wget -q --spider http://localhost:3460/api/health || exit 1
 STOPSIGNAL SIGTERM
 CMD ["node", "src/server.js"]

@@ -8,10 +8,10 @@ function createItemFieldRepo(db) {
       return db.prepare('SELECT * FROM item_fields WHERE item_id = ? ORDER BY id ASC').all(itemId);
     },
 
-    create(itemId, { field_def_id, value_encrypted, value_iv, value_tag }) {
+    create(itemId, { field_def_id, value_encrypted, value_iv, value_tag, strength_score, password_last_changed }) {
       const result = db.prepare(
-        'INSERT INTO item_fields (item_id, field_def_id, value_encrypted, value_iv, value_tag) VALUES (?, ?, ?, ?, ?)'
-      ).run(itemId, field_def_id, value_encrypted, value_iv, value_tag);
+        'INSERT INTO item_fields (item_id, field_def_id, value_encrypted, value_iv, value_tag, strength_score, password_last_changed) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(itemId, field_def_id, value_encrypted, value_iv, value_tag, strength_score != null ? strength_score : null, password_last_changed || null);
       return db.prepare('SELECT * FROM item_fields WHERE id = ?').get(result.lastInsertRowid);
     },
 
@@ -20,7 +20,7 @@ function createItemFieldRepo(db) {
       if (!existing) throw new NotFoundError('ItemField', id);
       const fields = [];
       const values = [];
-      for (const key of ['value_encrypted', 'value_iv', 'value_tag', 'field_def_id']) {
+      for (const key of ['value_encrypted', 'value_iv', 'value_tag', 'field_def_id', 'strength_score', 'password_last_changed']) {
         if (data[key] !== undefined) {
           fields.push(`${key} = ?`);
           values.push(data[key]);
@@ -38,12 +38,12 @@ function createItemFieldRepo(db) {
 
     bulkCreate(itemId, fields) {
       const insertStmt = db.prepare(
-        'INSERT INTO item_fields (item_id, field_def_id, value_encrypted, value_iv, value_tag) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO item_fields (item_id, field_def_id, value_encrypted, value_iv, value_tag, strength_score, password_last_changed) VALUES (?, ?, ?, ?, ?, ?, ?)'
       );
       const txn = db.transaction(() => {
         const created = [];
         for (const f of fields) {
-          const result = insertStmt.run(itemId, f.field_def_id, f.value_encrypted, f.value_iv, f.value_tag);
+          const result = insertStmt.run(itemId, f.field_def_id, f.value_encrypted, f.value_iv, f.value_tag, f.strength_score != null ? f.strength_score : null, f.password_last_changed || null);
           created.push(db.prepare('SELECT * FROM item_fields WHERE id = ?').get(result.lastInsertRowid));
         }
         return created;
