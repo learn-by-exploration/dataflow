@@ -1374,13 +1374,13 @@ function renderSettings(tab) {
               <td>${esc(s.sid)}${s.is_current ? ' <strong>(current)</strong>' : ''}</td>
               <td>${esc(s.created_at)}</td>
               <td>${esc(s.expires_at)}</td>
-              <td>${s.is_current ? '' : '<button class="btn btn-sm btn-secondary revoke-session-btn" data-sid="' + escA(s.sid_full) + '">Revoke</button>'}</td>
+              <td>${s.is_current ? '' : '<button class="btn btn-sm btn-secondary revoke-session-btn" data-ref="' + escA(s.ref) + '">Revoke</button>'}</td>
             </tr>`).join('') +
             '</tbody></table>';
           list.querySelectorAll('.revoke-session-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
               try {
-                await api.delete('/api/auth/sessions/' + btn.dataset.sid);
+                await api.del('/api/auth/sessions/' + btn.dataset.ref);
                 toast('Session revoked', 'success');
                 renderSettings('security');
               } catch { toast('Failed to revoke session', 'error'); }
@@ -1390,7 +1390,7 @@ function renderSettings(tab) {
       })();
       $('revoke-all-sessions')?.addEventListener('click', async () => {
         try {
-          await api.delete('/api/auth/sessions');
+          await api.del('/api/auth/sessions');
           toast('All other sessions revoked', 'success');
           renderSettings('security');
         } catch { toast('Failed to revoke sessions', 'error'); }

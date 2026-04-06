@@ -127,6 +127,54 @@ module.exports = function createAuthRoutes({ db, audit }) {
     });
   });
 
+  // ─── GET /api/auth/me — alias for /api/auth/session ───
+  router.get('/api/auth/me', (req, res) => {
+    const sid = req.cookies && req.cookies[cookieName()];
+    const user = authService.getSession(sid);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    res.json({ user });
+  });
+
+  // ─── POST /api/auth/unlock — re-derive vault key from master password ───
+  router.post('/api/auth/unlock', requireAuth, async (req, res, next) => {
+    try {
+      const { master_password } = req.body;
+      if (!master_password) {
+        return res.status(400).json({ error: 'master_password is required' });
+      }
+
+      const { deriveKey, unwrapVaultKey, zeroBuffer } = require('../services/encryption');
+      const authRepo = require('../repositories/auth.repository')(db);
+      const user = authRepo.findUserById(req.userId);
+      if (!user || !user.vault_key_encrypted) {
+        return res.status(400).json({ error: 'No vault key configured' });
+      }
+
+      const salt = Buffer.from(user.master_key_salt, 'hex');
+      const params = JSON.parse(user.master_key_params);
+      const derivedKey = await deriveKey(master_password, salt, params);
+
+      const wrapped = JSON.parse(user.vault_key_encrypted);
+      let vaultKey;
+      try {
+        vaultKey = unwrapVaultKey(wrapped, derivedKey);
+      } catch {
+        return res.status(401).json({ error: 'Invalid master password' });
+      }
+
+      const sid = req.cookies && req.cookies[cookieName()];
+      sessionVault.setVaultKey(sid, vaultKey, req.userId);
+      zeroBuffer(vaultKey);
+      zeroBuffer(derivedKey);
+
+      res.json({ ok: true });
+    } catch (err) { next(err); }
+  });
+
   // ─── PUT /api/auth/password ───
   router.put('/api/auth/password', validate({ body: changePasswordSchema }), async (req, res, next) => {
     try {
