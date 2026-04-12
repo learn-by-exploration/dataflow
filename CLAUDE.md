@@ -12,6 +12,10 @@ Includes authentication, RBAC, item-level encryption, family sharing, emergency 
 
 **Core hierarchy:** Family (Vault) → Member → Category → Item → Field/Attachment
 
+> **Shared standards** (git workflow, security rules, testing strategy, backend service architecture,
+> error handling, anti-patterns, documentation requirements) are in the parent repo's `CLAUDE.md`.
+> All standards defined there apply here. This file covers DataFlow-specific structure and conventions only.
+
 ## Quick Start
 
 ```bash
