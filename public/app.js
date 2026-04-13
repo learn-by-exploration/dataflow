@@ -3,6 +3,11 @@
 
 import { esc, escA, $, formatDate, formatRelative, copyToClipboard, toast, debounce, showToast } from './js/utils.js';
 import { api, getCsrfToken } from './js/api.js';
+import { mount as mountDocuments } from './js/views/documents.js';
+import { mount as mountPasswords } from './js/views/passwords.js';
+import { mount as mountIds } from './js/views/ids.js';
+import { mount as mountNotes } from './js/views/notes.js';
+import { mount as mountSearch } from './js/views/search.js';
 
 // ─── STATE ───
 let categories = [], items = [], tags = [], recordTypes = [];
@@ -247,6 +252,11 @@ function route() {
     case 'manage-categories': renderCategoryEditor(); break;
     case 'analytics': renderAnalyticsView(); break;
     case 'activity': renderActivityView(); break;
+    case 'documents': mountDocuments($('view-container')); break;
+    case 'passwords': mountPasswords($('view-container')); break;
+    case 'ids': mountIds($('view-container')); break;
+    case 'notes': mountNotes($('view-container')); break;
+    case 'search': mountSearch($('view-container'), param); break;
     default: renderDashboard();
   }
 
