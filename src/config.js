@@ -14,6 +14,7 @@ const config = Object.freeze({
   nodeEnv: process.env.NODE_ENV || 'development',
   isTest: process.env.NODE_ENV === 'test',
   isProd: process.env.NODE_ENV === 'production',
+  secureCookie: process.env.SECURE_COOKIE === 'true' || (process.env.SECURE_COOKIE !== 'false' && process.env.NODE_ENV === 'production' && (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true')),
   version,
   session: {
     maxAgeDays: parseInt(process.env.SESSION_MAX_AGE_DAYS, 10) || 7,

@@ -50,7 +50,7 @@ app.use(helmet({
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
-      upgradeInsecureRequests: config.trustProxy ? [] : null,
+      upgradeInsecureRequests: config.secureCookie ? [] : null,
       reportUri: '/api/csp-report',
     },
   },

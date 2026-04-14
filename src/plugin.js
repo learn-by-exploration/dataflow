@@ -46,7 +46,7 @@ module.exports = function initPlugin(context) {
         // DataFlow uses Argon2 for vault encryption, but for the users table
         // we just need a placeholder since auth is handled by the monolith
         db.prepare(
-          "INSERT OR IGNORE INTO users (id, email, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 'user', 1, ?)"
+          "INSERT OR IGNORE INTO users (id, email, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 'adult', 1, ?)"
         ).run(authUser.id, authUser.email, 'MONOLITH_MANAGED', authUser.display_name || '', authUser.created_at);
       }
     }
@@ -60,6 +60,95 @@ module.exports = function initPlugin(context) {
 
   // ─── Build router with all DataFlow routes ───
   const router = Router();
+
+  // ─── Plugin-mode auth proxy routes ───
+  // The standalone routes/auth.js uses absolute paths (/api/auth/xxx) which
+  // don't work when mounted as a plugin. Add relative-path adapters here.
+
+  // GET /auth/me — return current user info
+  router.get('/auth/me', (req, res) => {
+    if (!req.userId) return res.status(401).json({ error: 'Not authenticated' });
+    const authUser = authDb.prepare('SELECT id, email, display_name FROM users WHERE id = ?').get(req.userId);
+    if (!authUser) return res.status(401).json({ error: 'User not found' });
+    const dfUser = db.prepare('SELECT role FROM users WHERE id = ?').get(req.userId);
+    res.json({ user: { id: authUser.id, email: authUser.email, display_name: authUser.display_name, role: dfUser?.role || 'user' } });
+  });
+
+  // GET /auth/session — alias for me
+  router.get('/auth/session', (req, res) => {
+    if (!req.userId) return res.status(401).json({ error: 'Not authenticated' });
+    const authUser = authDb.prepare('SELECT id, email, display_name FROM users WHERE id = ?').get(req.userId);
+    if (!authUser) return res.status(401).json({ error: 'User not found' });
+    const dfUser = db.prepare('SELECT role FROM users WHERE id = ?').get(req.userId);
+    res.json({ user: { id: authUser.id, email: authUser.email, display_name: authUser.display_name, role: dfUser?.role || 'user' } });
+  });
+
+  // POST /auth/unlock — derive vault key from master password and store in session memory
+  router.post('/auth/unlock', async (req, res) => {
+    try {
+      const { master_password } = req.body;
+      if (!master_password) return res.status(400).json({ error: 'master_password is required' });
+      const { deriveKey, unwrapVaultKey, zeroBuffer } = require('./services/encryption');
+      const authRepo = require('./repositories/auth.repository')(db);
+      const user = authRepo.findUserById(req.userId);
+      if (!user || !user.vault_key_encrypted) {
+        return res.status(400).json({ error: 'No vault key configured. Please set up your vault first.' });
+      }
+      const salt = Buffer.from(user.master_key_salt, 'hex');
+      const params = JSON.parse(user.master_key_params);
+      const derivedKey = await deriveKey(master_password, salt, params);
+      const wrapped = JSON.parse(user.vault_key_encrypted);
+      let vaultKey;
+      try {
+        vaultKey = unwrapVaultKey(wrapped, derivedKey);
+      } catch {
+        zeroBuffer(derivedKey);
+        return res.status(401).json({ error: 'Invalid master password' });
+      }
+      sessionVault.setVaultKey(req.sessionId, vaultKey, req.userId);
+      zeroBuffer(vaultKey);
+      zeroBuffer(derivedKey);
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, 'Vault unlock error');
+      res.status(500).json({ error: 'Vault unlock failed' });
+    }
+  });
+
+  // POST /auth/setup-vault — first-time vault setup for monolith-managed users
+  router.post('/auth/setup-vault', async (req, res) => {
+    try {
+      const { master_password } = req.body;
+      if (!master_password) return res.status(400).json({ error: 'master_password is required' });
+      const authRepo = require('./repositories/auth.repository')(db);
+      const user = authRepo.findUserById(req.userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (user.vault_key_encrypted) return res.status(409).json({ error: 'Vault already configured' });
+      const crypto = require('crypto');
+      const { deriveKey, generateVaultKey, wrapVaultKey, zeroBuffer } = require('./services/encryption');
+      const salt = crypto.randomBytes(32);
+      const params = { algorithm: 'argon2id', parallelism: 1, iterations: 3, memory: 65536 };
+      const derivedKey = await deriveKey(master_password, salt, params);
+      const vaultKey = generateVaultKey();
+      const wrapped = wrapVaultKey(vaultKey, derivedKey);
+      db.prepare(
+        'UPDATE users SET master_key_salt = ?, master_key_params = ?, vault_key_encrypted = ? WHERE id = ?'
+      ).run(salt.toString('hex'), JSON.stringify(params), JSON.stringify(wrapped), req.userId);
+      sessionVault.setVaultKey(req.sessionId, vaultKey, req.userId);
+      zeroBuffer(vaultKey);
+      zeroBuffer(derivedKey);
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, 'Vault setup error');
+      res.status(500).json({ error: 'Vault setup failed' });
+    }
+  });
+
+  // POST /auth/logout — clear vault key from session memory
+  router.post('/auth/logout', (req, res) => {
+    if (req.sessionId) sessionVault.clearVaultKey(req.sessionId);
+    res.json({ ok: true });
+  });
 
   // DataFlow has its own auth/unlock endpoint for vault key derivation
   // This is NOT the login endpoint — it's a vault-specific unlock

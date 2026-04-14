@@ -13,7 +13,7 @@ const createRecoveryService = require('../services/recovery.service');
 
 /** Helper: get the session cookie name based on environment */
 function cookieName() {
-  return config.isProd ? '__Host-df_sid' : 'df_sid';
+  return config.secureCookie ? '__Host-df_sid' : 'df_sid';
 }
 
 /** Helper: build Set-Cookie header for session */
@@ -26,7 +26,7 @@ function sessionCookie(sid, maxAgeDays) {
     `Path=/`,
     `Max-Age=${maxAgeDays * 86400}`,
   ];
-  if (config.isProd) parts.push('Secure');
+  if (config.secureCookie) parts.push('Secure');
   return parts.join('; ');
 }
 
@@ -34,7 +34,7 @@ function sessionCookie(sid, maxAgeDays) {
 function clearSessionCookie() {
   const name = cookieName();
   const parts = [`${name}=`, 'HttpOnly', 'SameSite=Strict', 'Path=/', 'Max-Age=0'];
-  if (config.isProd) parts.push('Secure');
+  if (config.secureCookie) parts.push('Secure');
   return parts.join('; ');
 }
 

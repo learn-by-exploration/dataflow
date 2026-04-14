@@ -2626,6 +2626,24 @@ function openImportWizard() {
 }
 
 // ─── ENHANCED FIELD TYPE RENDERING (#97) ───
+// Note: renderFieldInput is already declared above for item editing (3-arg version).
+// This is the 2-arg version for category field editing — renamed to avoid duplicate.
+function renderCategoryFieldInput(fieldDef, value) {
+  const n = `field-${fieldDef.id}`;
+  const v = escA(value || '');
+  switch (fieldDef.field_type) {
+    case 'date': return `<input type="date" name="${n}" id="${n}" value="${v}" class="form-input">`;
+    case 'phone': return `<input type="tel" name="${n}" id="${n}" value="${v}" class="form-input">`;
+    case 'url': return `<input type="url" name="${n}" id="${n}" value="${v}" class="form-input" placeholder="https://">`;
+    case 'email': return `<input type="email" name="${n}" id="${n}" value="${v}" class="form-input">`;
+    case 'select': {
+      const opts = fieldDef.options ? JSON.parse(fieldDef.options) : [];
+      return `<select name="${n}" id="${n}" class="form-input">${opts.map(o => `<option value="${escA(o)}" ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
+    }
+    default: return `<input type="text" name="${n}" id="${n}" value="${v}" class="form-input">`;
+  }
+}
+
 function renderFieldValue(value, fieldType) {
   if (!value) return esc(value || '');
   switch (fieldType) {
@@ -2639,22 +2657,6 @@ function renderFieldValue(value, fieldType) {
       try { return esc(new Date(value).toLocaleDateString()); } catch { return esc(value); }
     default:
       return esc(value);
-  }
-}
-
-function renderFieldInput(fieldDef, value) {
-  const n = `field-${fieldDef.id}`;
-  const v = escA(value || '');
-  switch (fieldDef.field_type) {
-    case 'date': return `<input type="date" name="${n}" id="${n}" value="${v}" class="form-input">`;
-    case 'phone': return `<input type="tel" name="${n}" id="${n}" value="${v}" class="form-input">`;
-    case 'url': return `<input type="url" name="${n}" id="${n}" value="${v}" class="form-input" placeholder="https://">`;
-    case 'email': return `<input type="email" name="${n}" id="${n}" value="${v}" class="form-input">`;
-    case 'select': {
-      const opts = fieldDef.options ? JSON.parse(fieldDef.options) : [];
-      return `<select name="${n}" id="${n}" class="form-input">${opts.map(o => `<option value="${escA(o)}" ${o === value ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
-    }
-    default: return `<input type="text" name="${n}" id="${n}" value="${v}" class="form-input">`;
   }
 }
 

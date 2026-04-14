@@ -12,6 +12,7 @@ services:
       - DB_DIR=/app/data
       - PORT=3460
       - TRUST_PROXY=1
+      - SECURE_COOKIE=false
     restart: always
     read_only: true
     tmpfs:
