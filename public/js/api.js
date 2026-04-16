@@ -22,7 +22,13 @@ async function _fetch(method, path, body) {
     }
     const r = await fetch(path, opts);
     if (r.status === 401) {
-      window.location.href = '/login.html';
+      // Vault-locked 401 should show lock screen, not redirect to login
+      const data = await r.json().catch(() => ({}));
+      if (data.error && /vault.*lock/i.test(data.error)) {
+        return { error: data.error, vaultLocked: true };
+      }
+      const base = document.querySelector('base')?.href || window.location.origin + '/';
+      window.location.href = new URL('login.html', base).href;
       return {};
     }
     if (!r.ok) {

@@ -15,6 +15,7 @@ let members = [], auditLog = [];
 let currentView = 'dashboard';
 let currentUser = null;
 let vaultLocked = false;
+let vaultConfigured = true; // assume configured until proven otherwise
 let autoLockTimer = null;
 let autoLockMs = 5 * 60 * 1000; // 5 minutes default
 let searchQuery = '';
@@ -22,6 +23,12 @@ let editingItem = null;
 let currentCategoryId = null;
 let auditPage = 1;
 const AUDIT_PAGE_SIZE = 25;
+
+// Build login URL relative to current base (supports orchestrator prefix or standalone)
+function loginUrl() {
+  const base = document.querySelector('base')?.href || window.location.origin + '/';
+  return new URL('login.html', base).href;
+}
 
 // ─── SCREEN READER ANNOUNCEMENTS ───
 function announce(message) {
@@ -146,17 +153,25 @@ async function init() {
   try {
     await loadCurrentUser();
     if (!currentUser) return;
+  } catch (e) {
+    window.location.href = loginUrl();
+    return;
+  }
+
+  try {
     await loadData();
     route();
     window.addEventListener('hashchange', route);
     checkOnboarding();
   } catch (e) {
-    window.location.href = '/login.html';
+    // Data load failure (e.g. vault locked) — don't redirect, show lock screen
+    console.error('Data load failed:', e);
+    lockVault();
   }
 
   // Register service worker
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }
 
@@ -165,6 +180,7 @@ async function loadCurrentUser() {
   const data = await api.get('/api/auth/me');
   if (data && data.user) {
     currentUser = data.user;
+    vaultConfigured = data.user.vault_configured !== false;
     const nameEl = $('sb-user-name');
     if (nameEl) nameEl.textContent = esc(data.user.display_name || data.user.email);
     const avatarEl = $('sb-avatar');
@@ -176,7 +192,7 @@ async function loadCurrentUser() {
       adminSection.style.display = '';
     }
   } else {
-    window.location.href = '/login.html';
+    window.location.href = loginUrl();
   }
 }
 
@@ -184,7 +200,7 @@ function initLogout() {
   const btn = $('sb-logout-btn');
   if (btn) btn.addEventListener('click', async () => {
     try { await api.post('/api/auth/logout'); } catch {}
-    window.location.href = '/login.html';
+    window.location.href = loginUrl();
   });
 }
 
@@ -195,9 +211,9 @@ async function loadData() {
     api.get('/api/record-types'),
     api.get('/api/tags'),
   ]);
-  categories = catRes.categories || catRes || [];
-  recordTypes = typesRes.recordTypes || typesRes || [];
-  tags = tagsRes.tags || tagsRes || [];
+  categories = Array.isArray(catRes) ? catRes : Array.isArray(catRes.categories) ? catRes.categories : [];
+  recordTypes = Array.isArray(typesRes) ? typesRes : Array.isArray(typesRes.recordTypes) ? typesRes.recordTypes : [];
+  tags = Array.isArray(tagsRes) ? tagsRes : Array.isArray(tagsRes.tags) ? tagsRes.tags : [];
   renderCategoryList();
   initLogout();
 }
@@ -208,20 +224,25 @@ async function loadItems(query) {
   if (currentCategoryId) params.set('category_id', currentCategoryId);
   const qs = params.toString();
   const res = await api.get('/api/items' + (qs ? '?' + qs : ''));
-  items = res.items || res || [];
+  if (res && res.vaultLocked) {
+    items = [];
+    lockVault();
+    return items;
+  }
+  items = Array.isArray(res) ? res : Array.isArray(res.items) ? res.items : [];
   return items;
 }
 
 async function loadMembers() {
   const res = await api.get('/api/members');
-  members = res.members || res || [];
+  members = Array.isArray(res) ? res : Array.isArray(res.members) ? res.members : [];
   return members;
 }
 
 async function loadAuditLog(page) {
   const offset = ((page || 1) - 1) * AUDIT_PAGE_SIZE;
   const res = await api.get('/api/audit?limit=' + AUDIT_PAGE_SIZE + '&offset=' + offset);
-  auditLog = res.entries || res || [];
+  auditLog = Array.isArray(res) ? res : Array.isArray(res.entries) ? res.entries : [];
   return auditLog;
 }
 
@@ -445,7 +466,20 @@ function initLockScreen() {
 
 function lockVault() {
   vaultLocked = true;
-  $('lock-screen')?.classList.add('active');
+  const lockScreen = $('lock-screen');
+  const lockTitle = lockScreen?.querySelector('.lock-title');
+  const lockSubtitle = lockScreen?.querySelector('.lock-subtitle');
+  const lockBtn = $('lock-unlock');
+  if (!vaultConfigured) {
+    if (lockTitle) lockTitle.textContent = 'Set Up Vault';
+    if (lockSubtitle) lockSubtitle.textContent = 'Create a master password to secure your vault';
+    if (lockBtn) lockBtn.textContent = 'Create Vault';
+  } else {
+    if (lockTitle) lockTitle.textContent = 'Vault Locked';
+    if (lockSubtitle) lockSubtitle.textContent = 'Enter your master password to unlock';
+    if (lockBtn) lockBtn.textContent = 'Unlock';
+  }
+  lockScreen?.classList.add('active');
   $('lock-password')?.focus();
 }
 
@@ -453,16 +487,21 @@ async function unlockVault() {
   const pw = $('lock-password')?.value;
   if (!pw) return;
   try {
-    const res = await api.post('/api/auth/unlock', { master_password: pw });
+    const endpoint = vaultConfigured ? '/api/auth/unlock' : '/api/auth/setup-vault';
+    const res = await api.post(endpoint, { master_password: pw });
     if (res.error) {
       toast(res.error, 'error');
       return;
     }
+    vaultConfigured = true;
     vaultLocked = false;
     $('lock-screen')?.classList.remove('active');
     if ($('lock-password')) $('lock-password').value = '';
     clearTimeout(autoLockTimer);
     autoLockTimer = setTimeout(lockVault, autoLockMs);
+    // Reload data now that vault is unlocked
+    await loadData();
+    route();
   } catch {
     toast('Unlock failed', 'error');
   }

@@ -95,13 +95,13 @@ async function loadData() {
   rtId = rt.id;
   const rtDetail = await api.get('/api/record-types/' + rt.id);
   fdefs = (rtDetail && rtDetail.fields) ? rtDetail.fields : [];
-  const res = await api.get('/api/items?record_type_id=' + rt.id + '&limit=200');
+  const res = await api.get('/api/items?record_type_id=' + rt.id + '&limit=100');
   items = Array.isArray(res) ? res : (res.items || []);
 }
 
 async function reloadItems() {
   if (!rtId) return;
-  const res = await api.get('/api/items?record_type_id=' + rtId + '&limit=200');
+  const res = await api.get('/api/items?record_type_id=' + rtId + '&limit=100');
   items = Array.isArray(res) ? res : (res.items || []);
 }
 

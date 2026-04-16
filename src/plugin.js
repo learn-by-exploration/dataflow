@@ -70,8 +70,9 @@ module.exports = function initPlugin(context) {
     if (!req.userId) return res.status(401).json({ error: 'Not authenticated' });
     const authUser = authDb.prepare('SELECT id, email, display_name FROM users WHERE id = ?').get(req.userId);
     if (!authUser) return res.status(401).json({ error: 'User not found' });
-    const dfUser = db.prepare('SELECT role FROM users WHERE id = ?').get(req.userId);
-    res.json({ user: { id: authUser.id, email: authUser.email, display_name: authUser.display_name, role: dfUser?.role || 'user' } });
+    const dfUser = db.prepare('SELECT role, vault_key_encrypted FROM users WHERE id = ?').get(req.userId);
+    const vaultConfigured = !!(dfUser && dfUser.vault_key_encrypted);
+    res.json({ user: { id: authUser.id, email: authUser.email, display_name: authUser.display_name, role: dfUser?.role || 'user', vault_configured: vaultConfigured } });
   });
 
   // GET /auth/session — alias for me
